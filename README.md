@@ -4,3 +4,6 @@ USBasp firmware based on <a href="https://github.com/bperrybap/usbasp">a fork by
 
 Firmware version 1.06 (2020-09-14) eatures a default SCK clock of 1.5Mhz and automatic SCK slowing if target does not respond.
 
+## development plans
+Recognize when the target device is in debugWIRE mode, and send the dW command to enter ISP mode.
+
