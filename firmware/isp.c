@@ -18,12 +18,12 @@
 uchar sck_sw_delay;
 uchar isp_hiaddr;
 
-inline void spiHWenable() {
+static inline void spiHWenable() {
     /* enable SPI, master */
     SPCR |= (1 << SPE) | (1 << MSTR);
 }
 
-inline void spiHWdisable() {
+static inline void spiHWdisable() {
     SPCR = 0;
 }
 
@@ -99,27 +99,16 @@ void ispConnect() {
      * V-USB modifies DDR, so set only one at a time for atomic sbi */
     ISP_DDR |= (1 << ISP_SCK);
     ISP_DDR |= (1 << ISP_MOSI);
+    ISP_DDR |= (1 << ISP_RST);
 
     /* enable pullup on MISO for improved noise immunity */
     ISP_OUT |= (1 << ISP_MISO);
 
-    /* SCK must be low 2 clocks before RST low */ 
-    ispDelay();
-    ISP_DDR |= (1 << ISP_RST);
+    /* positive pulse on RST for at least 2 target clock cycles */
+    ISP_OUT |= (1 << ISP_RST);
+    clockWait(1);                       /* 320us */
+    ISP_OUT &= ~(1 << ISP_RST);
 
-#if 0
-    // todo: move reset to ispEnterProg
-    /* reset device */
-    ISP_OUT &= ~(1 << ISP_SCK); /* SCK low */
-    /* SCK must be low 2 clocks before RST low */ 
-    ispDelay();
-    ISP_OUT &= ~(1 << ISP_RST); /* RST low */
-
-    if (ispTransmit == ispTransmit_hw) {
-        spiHWenable();
-    }
-#endif
-    
     /* Initial extended address value */
     isp_hiaddr = 0xff;  /* ensure that even 0x00000 causes a write of the extended address byte */
 }
@@ -179,6 +168,7 @@ uchar ispEnterProgrammingMode() {
 
     if (prog_sck == 0) prog_sck = USBASP_ISP_SCK_1500;
 
+#if 0
     /* the first try often fails - need to debug why */
     if (ispTransmit == ispTransmit_hw) {
         spiHWenable();
@@ -190,11 +180,12 @@ uchar ispEnterProgrammingMode() {
 
     spiHWdisable();
     ispSetSCKOption(prog_sck);
+#endif
 
     while (prog_sck >= USBASP_ISP_SCK_0_5) {
         /* pulse RST */
         ISP_OUT |= (1 << ISP_RST);      /* RST high */
-        ispDelay();
+        clockWait(1);                   /* 320us */
         ISP_OUT &= ~(1 << ISP_RST);     /* RST low */
 
         if (ispTransmit == ispTransmit_hw) {
