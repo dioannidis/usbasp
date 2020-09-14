@@ -15,10 +15,10 @@
 /* wait time * 320 us */
 void clockWait(uint8_t time) {
 
-	uint8_t i;
-	for (i = 0; i < time; i++) {
+	//uint8_t i;
+	//for (i = 0; i < time; i++) {
+    do {
 		uint8_t starttime = TIMERVALUE;
-		while ((uint8_t) (TIMERVALUE - starttime) < CLOCK_T_320us) {
-		}
-	}
+		while ((uint8_t) (TIMERVALUE - starttime) < CLOCK_T_320us); 
+	} while (--time);
 }

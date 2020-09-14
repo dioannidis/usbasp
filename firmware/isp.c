@@ -7,7 +7,7 @@
  *                  over ISP interface
  * Licence........: GNU GPL v2 (see Readme.txt)
  * Creation Date..: 2005-02-23
- * Last change....: 2010-01-19
+ * Last change....: 2020-09-14
  */
 
 #include <avr/io.h>
@@ -16,11 +16,11 @@
 #include "usbasp.h"
 
 uchar sck_sw_delay;
-uchar sck_spcr;
 uchar isp_hiaddr;
 
 inline void spiHWenable() {
-    SPCR = sck_spcr;
+    /* enable SPI, master */
+    SPCR |= (1 << SPE) | (1 << MSTR);
 }
 
 inline void spiHWdisable() {
@@ -41,24 +41,22 @@ void ispSetSCKOption(uchar option) {
 
         case USBASP_ISP_SCK_1500:
         default:
-            /* enable SPI, master, 1.5MHz, XTAL/8 */
-            // sck_spcr = (1 << SPE) | (1 << MSTR) | (1 << SPR0);
+            /* 1.5MHz, XTAL/8 */
             SPSR = (1 << SPI2X);
         case USBASP_ISP_SCK_750:
-            /* enable SPI, master, 750kHz, XTAL/16 */
-            sck_spcr = (1 << SPE) | (1 << MSTR) | (1 << SPR0);
+            /* 750kHz, XTAL/16 */
+            SPCR = (1 << SPR0);
             break;
         case USBASP_ISP_SCK_375:
-            /* enable SPI, master, 375kHz, XTAL/32 (default) */
-            // sck_spcr = (1 << SPE) | (1 << MSTR) | (1 << SPR1);
+            /* 375kHz, XTAL/32 (default) */
             SPSR = (1 << SPI2X);
         case USBASP_ISP_SCK_187_5:
-            /* enable SPI, master, 187.5kHz XTAL/64 */
-            sck_spcr = (1 << SPE) | (1 << MSTR) | (1 << SPR1);
+            /* 187.5kHz XTAL/64 */
+            SPCR = (1 << SPR1);
             break;
         case USBASP_ISP_SCK_93_75:
-            /* enable SPI, master, 93.75kHz XTAL/128 */
-            sck_spcr = (1 << SPE) | (1 << MSTR) | (1 << SPR1) | (1 << SPR0);
+            /* 93.75kHz XTAL/128 */
+            SPCR = (1 << SPR1) | (1 << SPR0);
             break;
         }
 
@@ -99,13 +97,18 @@ void ispConnect() {
 
     /* all ISP pins were inputs before, now set output pins
      * V-USB modifies DDR, so set only one at a time for atomic sbi */
-    ISP_DDR |= (1 << ISP_RST);
     ISP_DDR |= (1 << ISP_SCK);
     ISP_DDR |= (1 << ISP_MOSI);
 
     /* enable pullup on MISO for improved noise immunity */
     ISP_OUT |= (1 << ISP_MISO);
 
+    /* SCK must be low 2 clocks before RST low */ 
+    ispDelay();
+    ISP_DDR |= (1 << ISP_RST);
+
+#if 0
+    // todo: move reset to ispEnterProg
     /* reset device */
     ISP_OUT &= ~(1 << ISP_SCK); /* SCK low */
     /* SCK must be low 2 clocks before RST low */ 
@@ -115,6 +118,7 @@ void ispConnect() {
     if (ispTransmit == ispTransmit_hw) {
         spiHWenable();
     }
+#endif
     
     /* Initial extended address value */
     isp_hiaddr = 0xff;  /* ensure that even 0x00000 causes a write of the extended address byte */
@@ -131,6 +135,7 @@ void ispDisconnect() {
     spiHWdisable();
 }
 
+// todo: make ispTransmit function that checks mode and branches
 uchar ispTransmit_sw(uchar send_byte) {
 
     uchar rec_byte = 0;
@@ -165,16 +170,39 @@ uchar ispTransmit_sw(uchar send_byte) {
 uchar ispTransmit_hw(uchar send_byte) {
     SPDR = send_byte;
 
-    while (!(SPSR & (1 << SPIF)))
-        ;
+    while (!(SPSR & (1 << SPIF)));
     return SPDR;
 }
 
 uchar ispEnterProgrammingMode() {
     uchar check;
-    uchar count = 32;
 
-    while (count--) {
+    if (prog_sck == 0) prog_sck = USBASP_ISP_SCK_1500;
+
+    /* the first try often fails - need to debug why */
+    if (ispTransmit == ispTransmit_hw) {
+        spiHWenable();
+    }
+    ispTransmit(0xAC);
+    ispTransmit(0x53);
+    ispTransmit(0);
+    ispTransmit(0);
+
+    spiHWdisable();
+    ispSetSCKOption(prog_sck);
+
+    while (prog_sck >= USBASP_ISP_SCK_0_5) {
+        /* pulse RST */
+        ISP_OUT |= (1 << ISP_RST);      /* RST high */
+        ispDelay();
+        ISP_OUT &= ~(1 << ISP_RST);     /* RST low */
+
+        if (ispTransmit == ispTransmit_hw) {
+            spiHWenable();
+        }
+
+        clockWait(20 / 0.320);          /* wait 20ms before PE */
+
         ispTransmit(0xAC);
         ispTransmit(0x53);
         check = ispTransmit(0);
@@ -186,17 +214,7 @@ uchar ispEnterProgrammingMode() {
 
         spiHWdisable();
 
-        /* pulse RST */
-        ispDelay();
-        ISP_OUT |= (1 << ISP_RST); /* RST high */
-        ispDelay();
-        ISP_OUT &= ~(1 << ISP_RST); /* RST low */
-        ispDelay();
-
-        if (ispTransmit == ispTransmit_hw) {
-            spiHWenable();
-        }
-
+        ispSetSCKOption(--prog_sck);    /* try lower speed */
     }
 
     return 1; /* error: device dosn't answer */

@@ -24,6 +24,9 @@
 #define ISP_MISO  PB4
 #define ISP_SCK   PB5
 
+/* defined in main.c */
+extern uchar prog_sck;
+
 /* Prepare connection to target device */
 void ispConnect();
 

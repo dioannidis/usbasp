@@ -31,7 +31,7 @@
 static uchar replyBuffer[8];
 
 static uchar prog_state = PROG_STATE_IDLE;
-static uchar prog_sck = USBASP_ISP_SCK_AUTO;
+uchar prog_sck = USBASP_ISP_SCK_AUTO;
 
 static uchar prog_address_newmode = 0;
 static unsigned long prog_address;
