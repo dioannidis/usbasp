@@ -8,8 +8,9 @@
 # TARGET=atmega48   HFUSE=0xdd  LFUSE=0xff
 # TARGET=at90s2313
 TARGET=atmega8
-HFUSE=0xc9
-LFUSE=0xef
+# C9 DF = full swing xtal, 4ms SUT
+HFUSE=0xC9
+LFUSE=0xDF
 
 
 # ISP=bsd      PORT=/dev/parport0
@@ -76,7 +77,7 @@ cpp:
 	$(COMPILE) -E main.c
 
 flash:
-	avrdude -c ${ISP} -p ${TARGET} -P ${PORT} -U flash:w:main.hex
+	avrdude -c ${ISP} -p ${TARGET} -P ${PORT} -U flash:w:main.hex:i
 
 fuses:
 	avrdude -c ${ISP} -p ${TARGET} -P ${PORT} -u -U hfuse:w:$(HFUSE):m -U lfuse:w:$(LFUSE):m
