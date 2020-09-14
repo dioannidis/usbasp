@@ -26,8 +26,6 @@
 #include "tpi.h"
 #include "tpi_defs.h"
 
-#include <util/delay.h>
-
 static uchar replyBuffer[8];
 
 static uchar prog_state = PROG_STATE_IDLE;
@@ -304,24 +302,18 @@ uchar usbFunctionWrite(uchar *data, uchar len) {
 }
 
 int main(void) {
-    /* no pullups on USB and ISP pins is default after reset */
-    // PORTD = 0;
-    // PORTB = 0;
-
     /* all outputs except PD2 = INT0 */
-    DDRD = ~(1 << 2);
-
-    /* output SE0 for USB reset */
-    DDRB = ~0;
-
-    /* USB Reset by device only required on Watchdog Reset */
-    _delay_ms(10);
-
-    /* all USB and ISP pins inputs */
-    DDRB = 0;
+    /* no need for this so leave them as inputs - RD */
+    // DDRD = ~(1 << 2);
 
     /* init timer */
     clockInit();
+
+    /* output SE0 for USB reset */
+    DDRB = ~0;
+    clockWait(10 / 0.320);              /* 10ms */
+    /* all USB and ISP pins inputs to end USB reset */
+    DDRB = 0;
 
     /* USBasp active */
     ledGreenOn();
