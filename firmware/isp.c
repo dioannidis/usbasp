@@ -39,6 +39,10 @@ void ispSetSCKOption(uchar option) {
 
         switch (option) {
 
+        case USBASP_ISP_SCK_3000:
+            /* 3MHz, XTAL/4 */
+            SPCR = 0;
+            break;
         case USBASP_ISP_SCK_1500:
         default:
             /* 1.5MHz, XTAL/8 */
@@ -168,40 +172,34 @@ uchar ispEnterProgrammingMode() {
 
     if (prog_sck == 0) prog_sck = USBASP_ISP_SCK_1500;
 
-#if 0
-    /* the first try often fails - need to debug why */
-    if (ispTransmit == ispTransmit_hw) {
-        spiHWenable();
-    }
-    ispTransmit(0xAC);
-    ispTransmit(0x53);
-    ispTransmit(0);
-    ispTransmit(0);
-
-    spiHWdisable();
-    ispSetSCKOption(prog_sck);
-#endif
-
     while (prog_sck >= USBASP_ISP_SCK_0_5) {
+        uchar (*spiTx)(uchar) = ispTransmit;
+
+        if (ispTransmit == ispTransmit_hw) spiHWenable();
+
+        uchar tries = 3;
+        do {
         /* pulse RST */
         ISP_OUT |= (1 << ISP_RST);      /* RST high */
         clockWait(1);                   /* 320us */
         ISP_OUT &= ~(1 << ISP_RST);     /* RST low */
 
-        if (ispTransmit == ispTransmit_hw) {
-            spiHWenable();
-        }
+        /* datasheet says wait 20ms, even though less seems fine */
+        clockWait(20 / 0.320);          /* wait before PE */
 
-        clockWait(20 / 0.320);          /* wait 20ms before PE */
-
-        ispTransmit(0xAC);
-        ispTransmit(0x53);
-        check = ispTransmit(0);
-        ispTransmit(0);
+        spiTx(0xAC);
+        spiTx(0x53);
+        check = spiTx(0);
+        spiTx(0);
 
         if (check == 0x53) {
+            /* bump up speed now that programming mode is enabled */
+            spiHWdisable();
+            ispSetSCKOption(prog_sck + 1);
+            if (ispTransmit == ispTransmit_hw) spiHWenable();
             return 0;
         }
+        } while (--tries);
 
         spiHWdisable();
 
