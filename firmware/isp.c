@@ -179,26 +179,26 @@ uchar ispEnterProgrammingMode() {
 
         uchar tries = 3;
         do {
-        /* pulse RST */
-        ISP_OUT |= (1 << ISP_RST);      /* RST high */
-        clockWait(1);                   /* 320us */
-        ISP_OUT &= ~(1 << ISP_RST);     /* RST low */
+            /* pulse RST */
+            ISP_OUT |= (1 << ISP_RST);      /* RST high */
+            clockWait(1);                   /* 320us */
+            ISP_OUT &= ~(1 << ISP_RST);     /* RST low */
 
-        /* datasheet says wait 20ms, even though less seems fine */
-        clockWait(20 / 0.320);          /* wait before PE */
+            /* datasheet says wait 20ms, even though less seems fine */
+            clockWait(20 / 0.320);          /* wait before PE */
 
-        spiTx(0xAC);
-        spiTx(0x53);
-        check = spiTx(0);
-        spiTx(0);
+            spiTx(0xAC);
+            spiTx(0x53);
+            check = spiTx(0);
+            spiTx(0);
 
-        if (check == 0x53) {
-            /* bump up speed now that programming mode is enabled */
-            spiHWdisable();
-            ispSetSCKOption(prog_sck + 1);
-            if (ispTransmit == ispTransmit_hw) spiHWenable();
-            return 0;
-        }
+            if (check == 0x53) {
+                /* bump up speed now that programming mode is enabled */
+                spiHWdisable();
+                ispSetSCKOption(prog_sck + 1);
+                if (ispTransmit == ispTransmit_hw) spiHWenable();
+                return 0;
+            }
         } while (--tries);
 
         spiHWdisable();
