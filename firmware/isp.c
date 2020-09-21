@@ -194,9 +194,11 @@ uchar ispEnterProgrammingMode() {
 
             if (check == 0x53) {
                 /* bump up speed now that programming mode is enabled */
+#               if DANGEROUS_MODE
                 spiHWdisable();
                 ispSetSCKOption(prog_sck + 1);
                 if (ispTransmit == ispTransmit_hw) spiHWenable();
+#               endif
                 return 0;
             }
         } while (--tries);
