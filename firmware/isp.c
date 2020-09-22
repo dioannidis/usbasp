@@ -122,7 +122,8 @@ void ispDisconnect() {
     /* set all ISP pins inputs */
     ISP_DDR &= ~((1 << ISP_RST) | (1 << ISP_SCK) | (1 << ISP_MOSI));
     /* switch pullups off */
-    ISP_OUT &= ~((1 << ISP_RST) | (1 << ISP_SCK) | (1 << ISP_MOSI));
+    ISP_OUT &= ~(1 << ISP_MISO);
+    ISP_OUT &= ~(1 << ISP_MOSI);
 
     /* disable hardware SPI */
     spiHWdisable();
@@ -193,8 +194,8 @@ uchar ispEnterProgrammingMode() {
             spiTx(0);
 
             if (check == 0x53) {
-                /* bump up speed now that programming mode is enabled */
 #               if DANGEROUS_MODE
+                /* bump up speed now that programming mode is enabled */
                 spiHWdisable();
                 ispSetSCKOption(prog_sck + 1);
                 if (ispTransmit == ispTransmit_hw) spiHWenable();
