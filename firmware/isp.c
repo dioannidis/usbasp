@@ -194,8 +194,9 @@ uchar ispEnterProgrammingMode() {
             spiTx(0);
 
             if (check == 0x53) {
-#               if DANGEROUS_MODE
+#               if TURBO_MODE
                 /* bump up speed now that programming mode is enabled */
+                /* http://nerdralph.blogspot.com/2020/09/recording-reset-pin.html */
                 spiHWdisable();
                 ispSetSCKOption(prog_sck + 1);
                 if (ispTransmit == ispTransmit_hw) spiHWenable();
