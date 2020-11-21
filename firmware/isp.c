@@ -127,6 +127,8 @@ void ispDisconnect() {
 
     /* disable hardware SPI */
     spiHWdisable();
+
+    prog_sck = USBASP_ISP_SCK_AUTO;
 }
 
 // todo: make ispTransmit function that checks mode and branches
@@ -171,7 +173,8 @@ uchar ispTransmit_hw(uchar send_byte) {
 uchar ispEnterProgrammingMode() {
     uchar check;
 
-    if (prog_sck == 0) prog_sck = USBASP_ISP_SCK_1500;
+    if (prog_sck == USBASP_ISP_SCK_AUTO)
+        prog_sck = USBASP_ISP_SCK_1500;
 
     while (prog_sck >= USBASP_ISP_SCK_0_5) {
         uchar (*spiTx)(uchar) = ispTransmit;
