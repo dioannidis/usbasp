@@ -12,14 +12,11 @@ TARGET ?= atmega8
 HFUSE=0xC9
 LFUSE=0xDF
 
-
-# ISP=bsd      PORT=/dev/parport0
 # ISP=ponyser  PORT=/dev/ttyS1
 # ISP=stk500   PORT=/dev/ttyS1
-# ISP=usbasp   PORT=/dev/usb/ttyUSB0
 # ISP=stk500v2 PORT=/dev/ttyUSB0
 ISP=usbasp
-PORT=/dev/usb/ttyUSB0
+PORT=USB
 
 help:
 	@echo "Usage: make                same as make help"
