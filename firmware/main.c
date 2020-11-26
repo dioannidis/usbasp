@@ -7,11 +7,8 @@
  * License........: GNU GPL v2 (see Readme.txt)
  * Target.........: ATMega8 at 12 MHz
  * Creation Date..: 2005-02-20
- * Last change....: 2020-09-11
+ * Last change....: 2020-11-26
  *
- * PC2 SCK speed option.
- * GND  -> slow (8khz SCK),
- * open -> software set speed (default is 375kHz SCK)
  */
 
 #include <avr/io.h>
@@ -45,11 +42,7 @@ uchar usbFunctionSetup(uchar data[8]) {
     if (data[1] == USBASP_FUNC_CONNECT) {
 
         /* set SCK speed */
-        if ((PINC & (1 << PC2)) == 0) {
-            ispSetSCKOption(USBASP_ISP_SCK_8);
-        } else {
-            ispSetSCKOption(prog_sck);
-        }
+        ispSetSCKOption(prog_sck);
 
         /* set compatibility mode of address delivering */
         prog_address_newmode = 0;
@@ -302,10 +295,6 @@ uchar usbFunctionWrite(uchar *data, uchar len) {
 }
 
 int main(void) {
-    /* all outputs except PD2 = INT0 */
-    /* no need for this so leave them as inputs - RD */
-    // DDRD = ~(1 << 2);
-
     /* init timer */
     clockInit();
 
