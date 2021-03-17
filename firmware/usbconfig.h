@@ -39,8 +39,7 @@ the newest features and options.
  * interrupt, the USB interrupt will also be triggered at Start-Of-Frame
  * markers every millisecond.]
  */
-//#define USB_CFG_CLOCK_KHZ 12000
-#define USB_CFG_CLOCK_KHZ 18000
+#define USB_CFG_CLOCK_KHZ 12000
 /* Clock rate of the AVR in kHz. Legal values are 12000, 12800, 15000, 16000,
  * 16500, 18000 and 20000. The 12.8 MHz and 16.5 MHz versions of the code
  * require no crystal, they tolerate +/- 1% deviation from the nominal
