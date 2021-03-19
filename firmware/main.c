@@ -35,7 +35,92 @@ static unsigned int prog_pagesize;
 static uchar prog_blockflags;
 static uchar prog_pagecounter;
 
+/* For Windows OS Descriptors we need to report that we support USB 2.0 */
+
+PROGMEM const char usbDescriptorDevice[18] = {    /* USB device descriptor */
+    18,         /* sizeof(usbDescriptorDevice): length of descriptor in bytes */
+    USBDESCR_DEVICE,        /* descriptor type */
+    0x00, 0x02,             /* USB version supported */
+    USB_CFG_DEVICE_CLASS,
+    USB_CFG_DEVICE_SUBCLASS,
+    0,                      /* protocol */
+    8,                      /* max packet size */
+    /* the following two casts affect the first byte of the constant only, but
+     * that's sufficient to avoid a warning with the default values.
+     */
+    (char)USB_CFG_VENDOR_ID,/* 2 bytes */
+    (char)USB_CFG_DEVICE_ID,/* 2 bytes */
+    USB_CFG_DEVICE_VERSION, /* 2 bytes */
+    1, /*USB_CFG_DESCR_PROPS_STRING_VENDOR != 0 ? 1 : 0,*/         /* manufacturer string index */
+    2, /*USB_CFG_DESCR_PROPS_STRING_PRODUCT != 0 ? 2 : 0, */        /* product string index */
+    3, /* USB_CFG_DESCR_PROPS_STRING_SERIAL_NUMBER != 0 ? 3 : 0, */  /* serial number string index */
+    1,          /* number of configurations */
+};
+
+
+/* See https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpeusb/c2f351f9-84d2-4a1b-9fe3-a6ca195f84d0 */
+
+#define MS_VENDOR_CODE 0x5D
+
+PROGMEM const char OS_STRING_DESCRIPTOR[18] = {
+  0x14,                                         /* Length: An unsigned byte and MUST be set to 0x14. */
+  0x03,                                         /* Type: An unsigned byte and MUST be set to 0x03. */
+  'M',0,'S',0,'F',0,'T',0,'1',0,'0',0,'0',0,    /* Signature: A Unicode string and MUST be set to "MSFT100". */
+  MS_VENDOR_CODE,                               /* MS Vendor Code: An unsigned byte, 
+                                                  it will be used to retrieve associated feature descriptors. */
+  0x00                                          /* Pad: An unsigned byte and MUST be set to 0x00. */ 
+};
+
+/* TODO: Change them to progmem consts */
+
+typedef struct
+{
+	uint32_t dwLength;
+	uint16_t bcdVersion;
+	uint16_t wIndex;
+	uint8_t bCount;
+	uint8_t reserved[7];
+} usbExtCompatHeader_t;
+
+typedef struct
+{
+	usbExtCompatHeader_t header;
+	uint8_t bFirstInterfaceNumber;
+	uint8_t reserved1;
+	char compatibleID[8];
+	char subCompatibleID[8];
+	uint8_t reserved2[6];
+} usbExtCompatDescriptor_t;
+
+static const usbExtCompatDescriptor_t msExtCompatDescriptor =
+{
+	{ sizeof(usbExtCompatDescriptor_t), 0x0100, 0x0004, 1 },
+	0,
+	1,
+	"WINUSB",
+	""
+};
+
+usbMsgLen_t usbFunctionDescriptor(struct usbRequest *rq) {
+
+  DBG1(0xEE, &rq->wValue.bytes[0], 2);
+
+  /* 0xEE OS string descriptor reply */   
+  if ((rq->wValue.bytes[1] == USBRQ_GET_DESCRIPTOR) && (rq->wValue.bytes[0] == 0xEE)) {
+
+	usbMsgPtr = (usbMsgPtr_t)&OS_STRING_DESCRIPTOR;
+
+	return sizeof(OS_STRING_DESCRIPTOR);
+
+  };
+
+  return 0;
+
+};
+
 uchar usbFunctionSetup(uchar data[8]) {
+
+    const usbRequest_t* request = (const usbRequest_t*)data;
 
     uchar len = 0;
 
@@ -178,15 +263,17 @@ uchar usbFunctionSetup(uchar data[8]) {
         prog_state = PROG_STATE_TPI_WRITE;
         len = 0xff; /* multiple out */
     
-    } else if (data[1] == USBASP_FUNC_GETCAPABILITIES) {
-        replyBuffer[0] = USBASP_CAP_0_TPI;
-        replyBuffer[1] = 0;
-        replyBuffer[2] = 0;
-        replyBuffer[3] = 0;
-        len = 4;
-    }
+	} else if (request->bRequest == MS_VENDOR_CODE) {
+		if (request->wIndex.word == 0x0004)
+		{
+			usbMsgPtr = (usbMsgPtr_t)&msExtCompatDescriptor;
+			return sizeof(msExtCompatDescriptor);
+		}
 
-    usbMsgPtr = replyBuffer;
+		return 0;
+	}
+
+	 usbMsgPtr = replyBuffer;
 
     return len;
 }
