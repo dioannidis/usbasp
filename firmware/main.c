@@ -61,7 +61,7 @@ static uchar prog_pagecounter;
    --------------------------------------------------------------------------
    |	Length	|	Type	|	Signature	|	MS Vendor Code	|	Pad		|
    --------------------------------------------------------------------------
-   |	0x14	|	0x03	|	MSFT100		|	unsigned byte	|	0x00	|
+   |	0x12	|	0x03	|	MSFT100		|	unsigned byte	|	0x00	|
    --------------------------------------------------------------------------
    
 	Length: An unsigned byte and MUST be set to 0x14.
@@ -146,7 +146,8 @@ static const usbExtCompatDescriptor_t msExtCompatDescriptor =
 
 #define MS_VENDOR_CODE 0x5D
 PROGMEM const char OS_STRING_DESCRIPTOR[18] = {
-  0x14,                                         /* Length: An unsigned byte and MUST be set to 0x14. */
+  0x12,                                         /* Length: An unsigned byte and MUST be set to 0x12. */
+  /*  https://docs.microsoft.com/en-us/windows-hardware/drivers/network/mb-interface-model-supplement */
   0x03,                                         /* Type: An unsigned byte and MUST be set to 0x03. */
   'M',0,'S',0,'F',0,'T',0,'1',0,'0',0,'0',0,    /* Signature: A Unicode string and MUST be set to "MSFT100". */
   MS_VENDOR_CODE,                               /* MS Vendor Code: An unsigned byte, 
