@@ -35,6 +35,62 @@ static unsigned int prog_pagesize;
 static uchar prog_blockflags;
 static uchar prog_pagecounter;
 
+
+/* USBasp default winusb driver for Windows.
+
+   To avoid using driver installation (Zadig, libusb) on Windows and use by default
+   the winusb default driver for USBasp, we need to use OS feature descriptors. 
+   All USB 2.0 devices ,when they are enumerated for the first time, Windows asks if 
+   there is an OS feature descriptor by sending a specific standard GET_DESCRIPTOR request
+   with the format :
+   
+   --------------------------------------------------------------------------------------------------
+   |	bmRequestType	|	bRequest		|	wValue	|	wIndex	|	wLength	|	Data			|
+   --------------------------------------------------------------------------------------------------
+   |	1000 0000B		|	GET_DESCRIPTOR	|	0x03EE	|	0x0000	|	0x12	|	Returned string	|
+   --------------------------------------------------------------------------------------------------
+   
+   It asks if there is a specific string descriptor at index 0xEE. Because this string 
+   descriptor request, is not by default handled by the V-USB, we change the USB_CFG_DESCR_PROPS_UNKNOWN
+   to be dynamic (USB_PROP_IS_DYNAMIC). This effectively tell the V-USB that for every 
+   unknown string index request to call the usbFunctionDescriptor function.
+   
+   usbFunctionDescriptor function returns an OS string descriptor using the version 1.00 format 
+   which has a fixed length of 18 bytes, with a structure as shown in the following table :
+
+   --------------------------------------------------------------------------
+   |	Length	|	Type	|	Signature	|	MS Vendor Code	|	Pad		|
+   --------------------------------------------------------------------------
+   |	0x12	|	0x03	|	MSFT100		|	unsigned byte	|	0x00	|
+   --------------------------------------------------------------------------
+   
+	Length: An unsigned byte and MUST be set to 0x14.
+
+	Type: An unsigned byte and MUST be set to 0x03.
+
+	Signature: A Unicode string and MUST be set to "MSFT100".
+
+	MS Vendor Code: An unsigned byte, it will be used to retrieve associated feature descriptors.
+
+	Pad: An unsigned byte and MUST be set to 0x00.
+
+    The Signature field contains a Unicode character array that identifies the descriptor as an 
+	OS string descriptor and includes the version number. For version 1.00, this array must be set 
+	to "MSFT100" (0x4D00 0x5300 0x4600 0x5400 0x3100 0x3000 0x3000).
+
+    The MS VendorCode field is used to retrieve the associated feature descriptors. This code is 
+	used as Request field in TS_URB_CONTROL_VENDOR_OR_CLASS_REQUEST section 2.2.9.12.
+	
+	In usbFunctionSetup we handle the feature request associated to MS Vendor Code we replied earlier 
+	and send an Extended Compat ID with the information that we want Windows to load the winusb default driver.
+
+    For More information see
+
+	https://docs.microsoft.com/en-us/windows-hardware/drivers/usbcon/microsoft-defined-usb-descriptors
+	https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpeusb/c2f351f9-84d2-4a1b-9fe3-a6ca195f84d0
+*/
+   
+   
 /* For Windows OS Descriptors we need to report that we support USB 2.0 */
 
 PROGMEM const char usbDescriptorDevice[18] = {    /* USB device descriptor */
@@ -57,19 +113,6 @@ PROGMEM const char usbDescriptorDevice[18] = {    /* USB device descriptor */
     1,          /* number of configurations */
 };
 
-
-/* See https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpeusb/c2f351f9-84d2-4a1b-9fe3-a6ca195f84d0 */
-
-#define MS_VENDOR_CODE 0x5D
-
-PROGMEM const char OS_STRING_DESCRIPTOR[18] = {
-  0x14,                                         /* Length: An unsigned byte and MUST be set to 0x14. */
-  0x03,                                         /* Type: An unsigned byte and MUST be set to 0x03. */
-  'M',0,'S',0,'F',0,'T',0,'1',0,'0',0,'0',0,    /* Signature: A Unicode string and MUST be set to "MSFT100". */
-  MS_VENDOR_CODE,                               /* MS Vendor Code: An unsigned byte, 
-                                                  it will be used to retrieve associated feature descriptors. */
-  0x00                                          /* Pad: An unsigned byte and MUST be set to 0x00. */ 
-};
 
 /* TODO: Change them to progmem consts */
 
@@ -101,12 +144,23 @@ static const usbExtCompatDescriptor_t msExtCompatDescriptor =
 	""
 };
 
+#define MS_VENDOR_CODE 0x5D
+PROGMEM const char OS_STRING_DESCRIPTOR[18] = {
+  0x12,                                         /* Length: An unsigned byte and MUST be set to 0x12. */
+  /*  https://docs.microsoft.com/en-us/windows-hardware/drivers/network/mb-interface-model-supplement */
+  0x03,                                         /* Type: An unsigned byte and MUST be set to 0x03. */
+  'M',0,'S',0,'F',0,'T',0,'1',0,'0',0,'0',0,    /* Signature: A Unicode string and MUST be set to "MSFT100". */
+  MS_VENDOR_CODE,                               /* MS Vendor Code: An unsigned byte, 
+                                                  it will be used to retrieve associated feature descriptors. */
+  0x00                                          /* Pad: An unsigned byte and MUST be set to 0x00. */ 
+};
+
 usbMsgLen_t usbFunctionDescriptor(struct usbRequest *rq) {
 
   DBG1(0xEE, &rq->wValue.bytes[0], 2);
 
-  /* 0xEE OS string descriptor reply */   
-  if ((rq->wValue.bytes[1] == USBRQ_GET_DESCRIPTOR) && (rq->wValue.bytes[0] == 0xEE)) {
+  /* string (3) request at index 0xEE, is an OS string descriptor request */   
+  if ((rq->wValue.bytes[1] == 3) && (rq->wValue.bytes[0] == 0xEE)) {
 
 	usbMsgPtr = (usbMsgPtr_t)&OS_STRING_DESCRIPTOR;
 
@@ -263,9 +317,13 @@ uchar usbFunctionSetup(uchar data[8]) {
         prog_state = PROG_STATE_TPI_WRITE;
         len = 0xff; /* multiple out */
     
-	} else if (request->bRequest == MS_VENDOR_CODE) {
+	/* Handle the OS feature request associated with the MS Vendor Code
+		we replied earlier in the OS String Descriptor request. See usbFunctionDescriptor. */
+	} else if (request->bRequest == MS_VENDOR_CODE) {		
 		if (request->wIndex.word == 0x0004)
 		{
+			/* Send the Extended Compat ID OS feature descriptor, 
+			  requesting to load the default winusb driver for us */
 			usbMsgPtr = (usbMsgPtr_t)&msExtCompatDescriptor;
 			return sizeof(msExtCompatDescriptor);
 		}
