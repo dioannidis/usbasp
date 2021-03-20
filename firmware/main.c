@@ -39,9 +39,9 @@ static uchar prog_pagecounter;
 /* USBasp default winusb driver for Windows.
 
    To avoid using driver installation (Zadig, libusb) on Windows and use by default
-   the winusb default driver for USBasp, we need to useOS feature descriptors. 
+   the winusb default driver for USBasp, we need to use OS feature descriptors. 
    All USB 2.0 devices ,when they are enumerated for the first time, Windows asks if 
-   there is a OS feature descriptor by sending a specidic standard GET_DESCRIPTOR request
+   there is an OS feature descriptor by sending a specific standard GET_DESCRIPTOR request
    with the format :
    
    --------------------------------------------------------------------------------------------------
@@ -55,8 +55,8 @@ static uchar prog_pagecounter;
    to be dynamic (USB_PROP_IS_DYNAMIC). This effectively tell the V-USB that for every 
    unknown string index request to call the usbFunctionDescriptor function.
    
-   usbFunctionDescriptor function returns a OS string descriptor using the version 1.00 format 
-   which has a fixed length of 18 bytes, with a structure as shown in the following table.
+   usbFunctionDescriptor function returns an OS string descriptor using the version 1.00 format 
+   which has a fixed length of 18 bytes, with a structure as shown in the following table :
 
    --------------------------------------------------------------------------
    |	Length	|	Type	|	Signature	|	MS Vendor Code	|	Pad		|
@@ -74,12 +74,15 @@ static uchar prog_pagecounter;
 
 	Pad: An unsigned byte and MUST be set to 0x00.
 
-    The Signature field contains a Unicode character array that identifies the descriptor as an OS string descriptor and includes the version number. For version 1.00, this array must be set to "MSFT100" (0x4D00 0x5300 0x4600 0x5400 0x3100 0x3000 0x3000).
+    The Signature field contains a Unicode character array that identifies the descriptor as an 
+	OS string descriptor and includes the version number. For version 1.00, this array must be set 
+	to "MSFT100" (0x4D00 0x5300 0x4600 0x5400 0x3100 0x3000 0x3000).
 
-    The MS VendorCode field is used to retrieve the associated feature descriptors. This code is used as Request field in TS_URB_CONTROL_VENDOR_OR_CLASS_REQUEST section 2.2.9.12.
+    The MS VendorCode field is used to retrieve the associated feature descriptors. This code is 
+	used as Request field in TS_URB_CONTROL_VENDOR_OR_CLASS_REQUEST section 2.2.9.12.
 	
 	In usbFunctionSetup we handle the feature request associated to MS Vendor Code we replied earlier 
-	and send a Extended Compat ID with the information that we want Windows to load the winusb default driver.
+	and send an Extended Compat ID with the information that we want Windows to load the winusb default driver.
 
     For More information see
 
@@ -155,7 +158,7 @@ usbMsgLen_t usbFunctionDescriptor(struct usbRequest *rq) {
 
   DBG1(0xEE, &rq->wValue.bytes[0], 2);
 
-  /* string (3) request at index 0xEE, is am OS string descriptor request */   
+  /* string (3) request at index 0xEE, is an OS string descriptor request */   
   if ((rq->wValue.bytes[1] == 3) && (rq->wValue.bytes[0] == 0xEE)) {
 
 	usbMsgPtr = (usbMsgPtr_t)&OS_STRING_DESCRIPTOR;
@@ -314,7 +317,7 @@ uchar usbFunctionSetup(uchar data[8]) {
         len = 0xff; /* multiple out */
     
 	/* Handle the OS feature request associated with the MS Vendor Code
-		we replied earlier in OS String Descriptor request. See usbFunctionDescriptor. */
+		we replied earlier in the OS String Descriptor request. See usbFunctionDescriptor. */
 	} else if (request->bRequest == MS_VENDOR_CODE) {		
 		if (request->wIndex.word == 0x0004)
 		{
