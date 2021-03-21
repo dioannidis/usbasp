@@ -179,7 +179,7 @@ PROGMEM const char OS_STRING_DESCRIPTOR[18] = {
 
 usbMsgLen_t usbFunctionDescriptor(struct usbRequest *rq) {
 
-  DBG1(0xEE, &rq->wValue.bytes[0], 2);
+  // DBG1(0xEE, &rq->wValue.bytes[0], 2);
 
   /* string (3) request at index 0xEE, is an OS string descriptor request */   
   if ((rq->wValue.bytes[1] == 3) && (rq->wValue.bytes[0] == 0xEE)) {
