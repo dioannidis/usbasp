@@ -67,7 +67,7 @@ static uchar prog_pagecounter;
    |	0x12	|	0x03	|	MSFT100		|	unsigned byte	|	0x00	|
    --------------------------------------------------------------------------
    
-	Length: An unsigned byte and MUST be set to 0x14.
+	Length: An unsigned byte and MUST be set to 0x12.
 
 	Type: An unsigned byte and MUST be set to 0x03.
 
@@ -91,6 +91,25 @@ static uchar prog_pagecounter;
 
 	https://docs.microsoft.com/en-us/windows-hardware/drivers/usbcon/microsoft-defined-usb-descriptors
 	https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpeusb/c2f351f9-84d2-4a1b-9fe3-a6ca195f84d0
+	
+	
+	!!! Notice !!!
+	
+	"After the operating system requests a Microsoft OS String Descriptor from a device, it creates the following registry key:
+
+	HLKM\SYSTEM\CurrentControlSet\Control\UsbFlags\vvvvpppprrrrr
+
+	The operating system creates a registry entry, named osvc, under this registry key that indicates 
+	whether the device supports Microsoft OS Descriptors. If the device does not provide a valid response 
+	the first time that the operating system queries it for a Microsoft OS String Descriptor, 
+	the operating system will make no further requests for that descriptor."
+	
+	If your firmware doesn't work please delete the registry key as stated above to retrigger a query from Windows.
+	
+	i.e. if your firmware has a device version of 0x07, 0x01 then there will be a registry key with the name :
+	
+	Computer\HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\usbflags\16C005DC0107
+	
 */
    
    
