@@ -38,6 +38,9 @@ static uchar prog_pagecounter;
 
 /* USBasp default winusb driver for Windows.
 
+   Based on the hard work by Marius Greuel @mariusgreuel ( https://github.com/mariusgreuel/USBasp ).
+   This is a non intrusive version, using an unaltered V-USB with no changes in it's usbdrv code.
+
    To avoid using driver installation (Zadig, libusb) on Windows and use by default
    the winusb default driver for USBasp, we need to use OS feature descriptors. 
    All USB 2.0 devices ,when they are enumerated for the first time, Windows asks if 
