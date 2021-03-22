@@ -47,6 +47,7 @@ void ispSetSCKOption(uchar option) {
         default:
             /* 1.5MHz, XTAL/8 */
             SPSR = (1 << SPI2X);
+            // fall through
         case USBASP_ISP_SCK_750:
             /* 750kHz, XTAL/16 */
             SPCR = (1 << SPR0);
@@ -54,6 +55,7 @@ void ispSetSCKOption(uchar option) {
         case USBASP_ISP_SCK_375:
             /* 375kHz, XTAL/32 (default) */
             SPSR = (1 << SPI2X);
+            // fall through
         case USBASP_ISP_SCK_187_5:
             /* 187.5kHz XTAL/64 */
             SPCR = (1 << SPR1);
