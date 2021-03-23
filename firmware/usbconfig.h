@@ -302,7 +302,7 @@ the newest features and options.
  *
  */
 
-#define USB_CFG_DESCR_PROPS_DEVICE                  0
+#define USB_CFG_DESCR_PROPS_DEVICE                  USB_PROP_LENGTH(18)
 #define USB_CFG_DESCR_PROPS_CONFIGURATION           0
 #define USB_CFG_DESCR_PROPS_STRINGS                 0
 #define USB_CFG_DESCR_PROPS_STRING_0                0
@@ -311,7 +311,7 @@ the newest features and options.
 #define USB_CFG_DESCR_PROPS_STRING_SERIAL_NUMBER    0
 #define USB_CFG_DESCR_PROPS_HID                     0
 #define USB_CFG_DESCR_PROPS_HID_REPORT              0
-#define USB_CFG_DESCR_PROPS_UNKNOWN                 0
+#define USB_CFG_DESCR_PROPS_UNKNOWN                 (USB_PROP_IS_DYNAMIC)
 
 /* ----------------------- Optional MCU Description ------------------------ */
 
