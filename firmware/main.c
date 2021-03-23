@@ -182,8 +182,6 @@ usbMsgLen_t usbFunctionDescriptor(struct usbRequest *rq) {
 
 uchar usbFunctionSetup(uchar data[8]) {
 
-    const usbRequest_t* request = (const usbRequest_t*)data;
-
     uchar len = 0;
 
     if (data[1] == USBASP_FUNC_CONNECT) {
@@ -325,21 +323,22 @@ uchar usbFunctionSetup(uchar data[8]) {
         prog_state = PROG_STATE_TPI_WRITE;
         len = 0xff; /* multiple out */
     
-	/* Handle the OS feature request associated with the MS Vendor Code
-		we replied earlier in the OS String Descriptor request. See usbFunctionDescriptor. */
-	} else if (request->bRequest == MS_VENDOR_CODE) {		
-		if (request->wIndex.word == 0x0004)
-		{
-			/* Send the Extended Compat ID OS feature descriptor, 
-			  requesting to load the default winusb driver for us */
-			usbMsgPtr = (usbMsgPtr_t)&OS_EXTENDED_COMPAT_ID;
-			return sizeof(OS_EXTENDED_COMPAT_ID);
-		}
+    /* Handle the OS feature request associated with the MS Vendor Code
+     we replied earlier in the OS String Descriptor request. See usbFunctionDescriptor. */
+    } else if (data[1] == MS_VENDOR_CODE) {
+      if (data[4] == 4)
+      {
+           /* Send the Extended Compat ID OS feature descriptor, 
+              requesting to load the default winusb driver for us */
+        usbMsgPtr = (usbMsgPtr_t)&OS_EXTENDED_COMPAT_ID;
+        return sizeof(OS_EXTENDED_COMPAT_ID);
+      }
+      
+      return 0;
+	  
+    }
 
-		return 0;
-	}
-
-	 usbMsgPtr = replyBuffer;
+    usbMsgPtr = replyBuffer;
 
     return len;
 }
