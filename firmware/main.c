@@ -135,41 +135,26 @@ PROGMEM const char usbDescriptorDevice[18] = {    /* USB device descriptor */
     1,          /* number of configurations */
 };
 
+/* OS Extended Compat ID feature descriptor */
 
-/* TODO: Change them to progmem consts */
-
-typedef struct
-{
-	uint32_t dwLength;
-	uint16_t bcdVersion;
-	uint16_t wIndex;
-	uint8_t bCount;
-	uint8_t reserved[7];
-} usbExtCompatHeader_t;
-
-typedef struct
-{
-	usbExtCompatHeader_t header;
-	uint8_t bFirstInterfaceNumber;
-	uint8_t reserved1;
-	char compatibleID[8];
-	char subCompatibleID[8];
-	uint8_t reserved2[6];
-} usbExtCompatDescriptor_t;
-
-static const usbExtCompatDescriptor_t msExtCompatDescriptor =
-{
-	{ sizeof(usbExtCompatDescriptor_t), 0x0100, 0x0004, 1, {0} },
-	0,
-	1,
-	"WINUSB",
-	"",
-	{0}
+PROGMEM const char OS_EXTENDED_COMPAT_ID[37] = {
+	/* Header */
+	0x25,													/* OS Extended Compat ID feature descriptor length */
+	0x01, 0x00,												/* OS Extended Compat ID version */
+	0x00, 0x04,												/* Index */
+	0x01,													/* Configurations count */
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,				/* Reserved */
+	/* Configuration */
+	0x00,													/* First Interface Number */
+	0x01,													/* Reserved */
+	'W','I','N','U','S','B', 0x00, 0x00,					/* Windows string Compatible ID */
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,			/* Windows string SubCompatible ID */ 
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00						/* Reserved */
 };
 
 #define MS_VENDOR_CODE 0x5D
 PROGMEM const char OS_STRING_DESCRIPTOR[18] = {
-  0x12,                                         /* Length: An unsigned byte and MUST be set to 0x12. */
+  0x12,                                         /* Length: An unsigned byte and MUST be set to 0x12. */  
   /*  https://docs.microsoft.com/en-us/windows-hardware/drivers/network/mb-interface-model-supplement */
   0x03,                                         /* Type: An unsigned byte and MUST be set to 0x03. */
   'M',0,'S',0,'F',0,'T',0,'1',0,'0',0,'0',0,    /* Signature: A Unicode string and MUST be set to "MSFT100". */
@@ -347,8 +332,8 @@ uchar usbFunctionSetup(uchar data[8]) {
 		{
 			/* Send the Extended Compat ID OS feature descriptor, 
 			  requesting to load the default winusb driver for us */
-			usbMsgPtr = (usbMsgPtr_t)&msExtCompatDescriptor;
-			return sizeof(msExtCompatDescriptor);
+			usbMsgPtr = (usbMsgPtr_t)&OS_EXTENDED_COMPAT_ID;
+			return sizeof(OS_EXTENDED_COMPAT_ID);
 		}
 
 		return 0;
