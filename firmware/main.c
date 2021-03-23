@@ -137,11 +137,11 @@ PROGMEM const char usbDescriptorDevice[18] = {    /* USB device descriptor */
 
 /* OS Extended Compat ID feature descriptor */
 
-PROGMEM const char OS_EXTENDED_COMPAT_ID[37] = {
+const char OS_EXTENDED_COMPAT_ID[40] = {
 	/* Header */
-	0x25,													/* OS Extended Compat ID feature descriptor length */
-	0x01, 0x00,												/* OS Extended Compat ID version */
-	0x00, 0x04,												/* Index */
+	0x28, 0x00, 0x00, 0x00,									/* OS Extended Compat ID feature descriptor length */
+	0x00, 0x01,												/* OS Extended Compat ID version */
+	0x04, 0x00,												/* Index */
 	0x01,													/* Configurations count */
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,				/* Reserved */
 	/* Configuration */
