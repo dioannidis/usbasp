@@ -43,7 +43,7 @@ static uchar prog_pagecounter;
 
    To avoid using driver installation (Zadig, libusb) on Windows and use by default
    the winusb default driver for USBasp, we need to use OS feature descriptors. 
-   All USB 2.0 devices ,when they are enumerated for the first time, Windows asks if 
+   All USB 2.0 devices, when they are enumerated for the first time, Windows asks if 
    there is an OS feature descriptor by sending a specific standard GET_DESCRIPTOR request
    with the format :
    
@@ -159,11 +159,12 @@ typedef struct
 
 static const usbExtCompatDescriptor_t msExtCompatDescriptor =
 {
-	{ sizeof(usbExtCompatDescriptor_t), 0x0100, 0x0004, 1 },
+	{ sizeof(usbExtCompatDescriptor_t), 0x0100, 0x0004, 1, {0} },
 	0,
 	1,
 	"WINUSB",
-	""
+	"",
+	{0}
 };
 
 #define MS_VENDOR_CODE 0x5D
