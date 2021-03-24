@@ -137,6 +137,7 @@ PROGMEM const char usbDescriptorDevice[18] = {    /* USB device descriptor */
 
 /* OS Extended Compat ID feature descriptor */
 
+PROGMEM
 const char OS_EXTENDED_COMPAT_ID[40] = {
 	/* Header */
 	0x28, 0x00, 0x00, 0x00,									/* OS Extended Compat ID feature descriptor length */
@@ -331,6 +332,7 @@ uchar usbFunctionSetup(uchar data[8]) {
            /* Send the Extended Compat ID OS feature descriptor, 
               requesting to load the default winusb driver for us */
         usbMsgPtr = (usbMsgPtr_t)&OS_EXTENDED_COMPAT_ID;
+        usbMsgFlags = USB_FLG_MSGPTR_IS_ROM;
         return sizeof(OS_EXTENDED_COMPAT_ID);
       }
       
