@@ -322,13 +322,6 @@ uchar usbFunctionSetup(uchar data[8]) {
         prog_nbytes = (data[7] << 8) | data[6];
         prog_state = PROG_STATE_TPI_WRITE;
         len = 0xff; /* multiple out */
-
-    } else if (data[1] == USBASP_FUNC_GETCAPABILITIES) {
-        replyBuffer[0] = USBASP_CAP_0_TPI;
-        replyBuffer[1] = 0;
-        replyBuffer[2] = 0;
-        replyBuffer[3] = 0;
-        len = 4;
     
     /* Handle the OS feature request associated with the MS Vendor Code
      we replied earlier in the OS String Descriptor request. See usbFunctionDescriptor. */
