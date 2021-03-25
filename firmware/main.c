@@ -13,7 +13,7 @@
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
-#include <avr/pgmspace.h>
+//#include <avr/pgmspace.h>
 #include <avr/wdt.h>
 
 #include "usbasp.h"
@@ -115,7 +115,7 @@ static uchar prog_pagecounter;
    
 /* For Windows OS Descriptors we need to report that we support USB 2.0 */
 
-PROGMEM const char usbDescriptorDevice[18] = {    /* USB device descriptor */
+__flash const char usbDescriptorDevice[18] = {    /* USB device descriptor */
     18,         /* sizeof(usbDescriptorDevice): length of descriptor in bytes */
     USBDESCR_DEVICE,        /* descriptor type */
     0x00, 0x02,             /* USB version supported */
@@ -137,8 +137,7 @@ PROGMEM const char usbDescriptorDevice[18] = {    /* USB device descriptor */
 
 /* OS Extended Compat ID feature descriptor */
 
-PROGMEM
-const char OS_EXTENDED_COMPAT_ID[40] = {
+__flash const char OS_EXTENDED_COMPAT_ID[40] = {
 	/* Header */
 	0x28, 0x00, 0x00, 0x00,									/* OS Extended Compat ID feature descriptor length */
 	0x00, 0x01,												/* OS Extended Compat ID version */
@@ -154,7 +153,7 @@ const char OS_EXTENDED_COMPAT_ID[40] = {
 };
 
 #define MS_VENDOR_CODE 0x5D
-PROGMEM const char OS_STRING_DESCRIPTOR[18] = {
+__flash const char OS_STRING_DESCRIPTOR[18] = {
   0x12,                                         /* Length: An unsigned byte and MUST be set to 0x12. */  
   /*  https://docs.microsoft.com/en-us/windows-hardware/drivers/network/mb-interface-model-supplement */
   0x03,                                         /* Type: An unsigned byte and MUST be set to 0x03. */
