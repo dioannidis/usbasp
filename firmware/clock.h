@@ -11,11 +11,21 @@
 #ifndef __clock_h_included__
 #define	__clock_h_included__
 
-#define F_CPU           12000000L   /* 12MHz */
+//#define F_CPU           12000000L   /* 12MHz */
 #define TIMERVALUE      TCNT0
-#define CLOCK_T_320us	60
+//#define CLOCK_T_320us	60
 
-#ifdef __AVR_ATmega8__
+#if F_CPU == 12000000
+# define CLOCK_T_320us	60
+#elif F_CPU == 18000000
+# define CLOCK_T_320us	90
+#elif F_CPU == 20000000
+# define CLOCK_T_320us	100
+#endif
+
+
+//#ifdef __AVR_ATmega8__
+#if (defined __AVR_ATmega8__) || (defined __AVR_ATmega8A__) || (defined __AVR_ATmega88__)
 #define TCCR0B  TCCR0
 #endif
 

@@ -27,8 +27,7 @@ uchar       usbConfiguration;   /* currently selected configuration. Administere
 volatile schar usbRxLen;        /* = 0; number of bytes in usbRxBuf; 0 means free, -1 for flow control */
 uchar       usbCurrentTok;      /* last token received or endpoint number for last OUT token if != 0 */
 uchar       usbRxToken;         /* token for data we received; or endpont number for last OUT */
-//volatile uchar usbTxLen = USBPID_NAK;   /* number of bytes to transmit with next IN token or handshake token */
-volatile uchar usbTxLen;   /* number of bytes to transmit with next IN token or handshake token */
+volatile uchar usbTxLen = USBPID_NAK;   /* number of bytes to transmit with next IN token or handshake token */
 uchar       usbTxBuf[USB_BUFSIZE];/* data to transmit with next IN, free if usbTxLen contains handshake token */
 #if USB_COUNT_SOF
 volatile uchar  usbSofCount;    /* incremented by assembler module every SOF */
@@ -45,8 +44,7 @@ uchar       usbCurrentDataToken;/* when we check data toggling to ignore duplica
 
 /* USB status registers / not shared with asm code */
 usbMsgPtr_t         usbMsgPtr;      /* data to transmit next -- ROM or RAM address */
-//static usbMsgLen_t  usbMsgLen = USB_NO_MSG; /* remaining number of bytes */
-static usbMsgLen_t  usbMsgLen; /* remaining number of bytes */
+static usbMsgLen_t  usbMsgLen = USB_NO_MSG; /* remaining number of bytes */
 uchar               usbMsgFlags;    /* flag values see USB_FLG_* */
 
 #define USB_FLG_USE_USER_RW     (1<<7)
@@ -66,7 +64,7 @@ optimizing hints:
 #if USB_CFG_DESCR_PROPS_STRING_0 == 0
 #undef USB_CFG_DESCR_PROPS_STRING_0
 #define USB_CFG_DESCR_PROPS_STRING_0    sizeof(usbDescriptorString0)
-__flash const char usbDescriptorString0[] = { /* language descriptor */
+PROGMEM const char usbDescriptorString0[] = { /* language descriptor */
     4,          /* sizeof(usbDescriptorString0): length of descriptor in bytes */
     3,          /* descriptor type */
     0x09, 0x04, /* language index (0x0409 = US-English) */
@@ -76,7 +74,7 @@ __flash const char usbDescriptorString0[] = { /* language descriptor */
 #if USB_CFG_DESCR_PROPS_STRING_VENDOR == 0 && USB_CFG_VENDOR_NAME_LEN
 #undef USB_CFG_DESCR_PROPS_STRING_VENDOR
 #define USB_CFG_DESCR_PROPS_STRING_VENDOR   sizeof(usbDescriptorStringVendor)
-__flash const int  usbDescriptorStringVendor[] = {
+PROGMEM const int  usbDescriptorStringVendor[] = {
     USB_STRING_DESCRIPTOR_HEADER(USB_CFG_VENDOR_NAME_LEN),
     USB_CFG_VENDOR_NAME
 };
@@ -85,7 +83,7 @@ __flash const int  usbDescriptorStringVendor[] = {
 #if USB_CFG_DESCR_PROPS_STRING_PRODUCT == 0 && USB_CFG_DEVICE_NAME_LEN
 #undef USB_CFG_DESCR_PROPS_STRING_PRODUCT
 #define USB_CFG_DESCR_PROPS_STRING_PRODUCT   sizeof(usbDescriptorStringDevice)
-__flash const int  usbDescriptorStringDevice[] = {
+PROGMEM const int  usbDescriptorStringDevice[] = {
     USB_STRING_DESCRIPTOR_HEADER(USB_CFG_DEVICE_NAME_LEN),
     USB_CFG_DEVICE_NAME
 };
@@ -94,7 +92,7 @@ __flash const int  usbDescriptorStringDevice[] = {
 #if USB_CFG_DESCR_PROPS_STRING_SERIAL_NUMBER == 0 && USB_CFG_SERIAL_NUMBER_LEN
 #undef USB_CFG_DESCR_PROPS_STRING_SERIAL_NUMBER
 #define USB_CFG_DESCR_PROPS_STRING_SERIAL_NUMBER    sizeof(usbDescriptorStringSerialNumber)
-__flash const int usbDescriptorStringSerialNumber[] = {
+PROGMEM const int usbDescriptorStringSerialNumber[] = {
     USB_STRING_DESCRIPTOR_HEADER(USB_CFG_SERIAL_NUMBER_LEN),
     USB_CFG_SERIAL_NUMBER
 };
@@ -107,7 +105,7 @@ __flash const int usbDescriptorStringSerialNumber[] = {
 #if USB_CFG_DESCR_PROPS_DEVICE == 0
 #undef USB_CFG_DESCR_PROPS_DEVICE
 #define USB_CFG_DESCR_PROPS_DEVICE  sizeof(usbDescriptorDevice)
-__flash const char usbDescriptorDevice[] = {    /* USB device descriptor */
+PROGMEM const char usbDescriptorDevice[] = {    /* USB device descriptor */
     18,         /* sizeof(usbDescriptorDevice): length of descriptor in bytes */
     USBDESCR_DEVICE,        /* descriptor type */
     0x10, 0x01,             /* USB version supported */
@@ -138,7 +136,7 @@ __flash const char usbDescriptorDevice[] = {    /* USB device descriptor */
 #if USB_CFG_DESCR_PROPS_CONFIGURATION == 0
 #undef USB_CFG_DESCR_PROPS_CONFIGURATION
 #define USB_CFG_DESCR_PROPS_CONFIGURATION   sizeof(usbDescriptorConfiguration)
-__flash const char usbDescriptorConfiguration[] = {    /* USB configuration descriptor */
+PROGMEM const char usbDescriptorConfiguration[] = {    /* USB configuration descriptor */
     9,          /* sizeof(usbDescriptorConfiguration): length of descriptor in bytes */
     USBDESCR_CONFIG,    /* descriptor type */
     18 + 7 * USB_CFG_HAVE_INTRIN_ENDPOINT + 7 * USB_CFG_HAVE_INTRIN_ENDPOINT3 +
@@ -617,8 +615,6 @@ isNotReset:
 
 USB_PUBLIC void usbInit(void)
 {
-    usbTxLen = USBPID_NAK;
-    usbMsgLen = USB_NO_MSG;
 #if USB_INTR_CFG_SET != 0
     USB_INTR_CFG |= USB_INTR_CFG_SET;
 #endif

@@ -3,6 +3,7 @@
  *
  * Thomas Fischl <tfischl@gmx.de>
  * 2020 fixes and tweaks by Ralph Doncaster (Nerd Ralph)
+ * 2021 Basic HID UART by Dimitrios Chr. Ioannidis
  *
  * License........: GNU GPL v2 (see Readme.txt)
  * Target.........: ATMega8 at 12 MHz
@@ -16,14 +17,18 @@
 //#include <avr/pgmspace.h>
 #include <avr/wdt.h>
 
+#include "oddebug.h"
 #include "usbasp.h"
 #include "usbdrv.h"
+#include "CBUF.h"
+#include "usb_descriptors.h"
 #include "isp.h"
 #include "clock.h"
 #include "tpi.h"
 #include "tpi_defs.h"
 
 static uchar replyBuffer[8];
+static uchar interruptBuffer[8];
 
 static uchar prog_state = PROG_STATE_IDLE;
 uchar prog_sck = USBASP_ISP_SCK_AUTO;
@@ -35,6 +40,14 @@ static unsigned int prog_pagesize;
 static uchar prog_blockflags;
 static uchar prog_pagecounter;
 
+#define test_Q_SIZE	128
+
+volatile struct
+{
+	uint8_t	m_getIdx;
+	uint8_t	m_putIdx;
+	uint8_t	m_entry[test_Q_SIZE];
+} test_Q;
 
 /* USBasp default winusb driver for Windows.
 
@@ -111,81 +124,34 @@ static uchar prog_pagecounter;
 	Computer\HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\usbflags\16C005DC0107
 	
 */
-   
-   
-/* For Windows OS Descriptors we need to report that we support USB 2.0 */
+     
+USB_PUBLIC usbMsgLen_t usbFunctionDescriptor(struct usbRequest *rq) {
 
-__flash const char usbDescriptorDevice[18] = {    /* USB device descriptor */
-    18,         /* sizeof(usbDescriptorDevice): length of descriptor in bytes */
-    USBDESCR_DEVICE,        /* descriptor type */
-    0x00, 0x02,             /* USB version supported */
-    USB_CFG_DEVICE_CLASS,
-    USB_CFG_DEVICE_SUBCLASS,
-    0,                      /* protocol */
-    8,                      /* max packet size */
-    /* the following two casts affect the first byte of the constant only, but
-     * that's sufficient to avoid a warning with the default values.
-     */
-    (char)USB_CFG_VENDOR_ID,/* 2 bytes */
-    (char)USB_CFG_DEVICE_ID,/* 2 bytes */
-    USB_CFG_DEVICE_VERSION, /* 2 bytes */
-    1, /*USB_CFG_DESCR_PROPS_STRING_VENDOR != 0 ? 1 : 0,*/         /* manufacturer string index */
-    2, /*USB_CFG_DESCR_PROPS_STRING_PRODUCT != 0 ? 2 : 0, */        /* product string index */
-    3, /* USB_CFG_DESCR_PROPS_STRING_SERIAL_NUMBER != 0 ? 3 : 0, */  /* serial number string index */
-    1,          /* number of configurations */
+  // DBG1(0xFD, (uchar *)rq, sizeof(usbRequest_t));
+
+	 usbMsgLen_t  len = 0;
+	 
+	/* string (3) request at index 0xEE, is an OS string descriptor request */   
+  
+	if(rq->wValue.bytes[1] == USBDESCR_STRING) {
+		if(rq->wValue.bytes[0] == MS_1_0_OS_DESCRIPTOR_INDEX) {
+			usbMsgPtr = (usbMsgPtr_t)&MS_1_0_OS_STRING_DESCRIPTOR;
+			len = sizeof(MS_1_0_OS_STRING_DESCRIPTOR);	 
+		}
+	}
+	
+	return len;
 };
 
-/* OS Extended Compat ID feature descriptor */
+USB_PUBLIC usbMsgLen_t usbFunctionSetup(uchar data[8]) {
 
-__flash const char OS_EXTENDED_COMPAT_ID[40] = {
-	/* Header */
-	0x28, 0x00, 0x00, 0x00,									/* OS Extended Compat ID feature descriptor length */
-	0x00, 0x01,												/* OS Extended Compat ID version */
-	0x04, 0x00,												/* Index */
-	0x01,													/* Configurations count */
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,				/* Reserved */
-	/* Configuration */
-	0x00,													/* First Interface Number */
-	0x01,													/* Reserved */
-	'W','I','N','U','S','B', 0x00, 0x00,					/* Windows string Compatible ID */
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,			/* Windows string SubCompatible ID */ 
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00						/* Reserved */
-};
-
-#define MS_VENDOR_CODE 0x5D
-__flash const char OS_STRING_DESCRIPTOR[18] = {
-  0x12,                                         /* Length: An unsigned byte and MUST be set to 0x12. */  
-  /*  https://docs.microsoft.com/en-us/windows-hardware/drivers/network/mb-interface-model-supplement */
-  0x03,                                         /* Type: An unsigned byte and MUST be set to 0x03. */
-  'M',0,'S',0,'F',0,'T',0,'1',0,'0',0,'0',0,    /* Signature: A Unicode string and MUST be set to "MSFT100". */
-  MS_VENDOR_CODE,                               /* MS Vendor Code: An unsigned byte, 
-                                                  it will be used to retrieve associated feature descriptors. */
-  0x00                                          /* Pad: An unsigned byte and MUST be set to 0x00. */ 
-};
-
-usbMsgLen_t usbFunctionDescriptor(struct usbRequest *rq) {
-
-  // DBG1(0xEE, &rq->wValue.bytes[0], 2);
-
-  /* string (3) request at index 0xEE, is an OS string descriptor request */   
-  if ((rq->wValue.bytes[1] == 3) && (rq->wValue.bytes[0] == 0xEE)) {
-
-	usbMsgPtr = (usbMsgPtr_t)&OS_STRING_DESCRIPTOR;
-
-	return sizeof(OS_STRING_DESCRIPTOR);
-
-  };
-
-  return 0;
-
-};
-
-uchar usbFunctionSetup(uchar data[8]) {
-
-    uchar len = 0;
+	DBG1(0xF5, data, 8);
+	
+    usbMsgLen_t len = 0;
+	usbRequest_t *rq = (usbRequest_t *)data;
 
     if (data[1] == USBASP_FUNC_CONNECT) {
-
+	
         /* set SCK speed */
         ispSetSCKOption(prog_sck);
 
@@ -325,26 +291,45 @@ uchar usbFunctionSetup(uchar data[8]) {
     
     /* Handle the OS feature request associated with the MS Vendor Code
      we replied earlier in the OS String Descriptor request. See usbFunctionDescriptor. */
-    } else if (data[1] == MS_VENDOR_CODE) {
-      if (data[4] == 4)
-      {
-           /* Send the Extended Compat ID OS feature descriptor, 
-              requesting to load the default winusb driver for us */
-        usbMsgPtr = (usbMsgPtr_t)&OS_EXTENDED_COMPAT_ID;
-        usbMsgFlags = USB_FLG_MSGPTR_IS_ROM;
-        return sizeof(OS_EXTENDED_COMPAT_ID);
+    } else if(rq->bmRequestType == REQUEST_GET_VENDOR_CUSTOM) {
+		if((rq->bRequest == MS_1_0_VENDOR_CODE) &&
+			(rq->wIndex.bytes[0] == MS_1_0_EXTEND_COMPAT_ID_FEATURE_INDEX)) {
+				
+				/* Send the Extended Compat ID OS feature descriptor, 
+				requesting to load the default winusb driver for us */
+				usbMsgFlags = USB_FLG_MSGPTR_IS_ROM;
+				usbMsgPtr = (usbMsgPtr_t)&MS_1_0_OS_EXTENDED_COMPAT_ID_FEATURE;
+				return sizeof(MS_1_0_OS_EXTENDED_COMPAT_ID_FEATURE);
       }
       
       return 0;
 	  
-    }
+    } else if(rq->bmRequestType == REQUEST_GET_MS_1_0_EXTEND_PROPERTIES) {
+		if((rq->bRequest == MS_1_0_VENDOR_CODE) &&
+			(rq->wIndex.bytes[0] == MS_1_0_EXTEND_PROPERTIES_FEATURE_INDEX)) {
+
+			 usbMsgFlags = USB_FLG_MSGPTR_IS_ROM;
+			 switch(data[2]) {
+				 case 0:
+					usbMsgPtr = (usbMsgPtr_t)&MS_1_0_OS_EXTENDED_PROPERTIES_FEATURE_INTF0;
+					return sizeof(MS_1_0_OS_EXTENDED_PROPERTIES_FEATURE_INTF0);
+				 break;
+				 default:
+				 break;
+			 }
+		 }
+		 
+		 return 0;
+		 
+	 } 
+		
 
     usbMsgPtr = replyBuffer;
 
     return len;
 }
 
-uchar usbFunctionRead(uchar *data, uchar len) {
+USB_PUBLIC uchar usbFunctionRead(uchar *data, uchar len) {
 
     uchar i;
 
@@ -380,7 +365,7 @@ uchar usbFunctionRead(uchar *data, uchar len) {
     return len;
 }
 
-uchar usbFunctionWrite(uchar *data, uchar len) {
+USB_PUBLIC uchar usbFunctionWrite(uchar *data, uchar len) {
 
     uchar retVal = 0;
     uchar i;
@@ -447,7 +432,41 @@ uchar usbFunctionWrite(uchar *data, uchar len) {
     return retVal;
 }
 
+USB_PUBLIC void usbFunctionWriteOut(uchar *data, uchar len){
+	 
+	DBG1(0x3F, data, len);
+	 
+	while(len--){
+		if (!CBUF_IsFull(test_Q)){
+			CBUF_AdvancePushIdx(test_Q);
+			*CBUF_GetPushEntryPtr(test_Q) = *data++;
+		}
+	} 
+}
+
+void HID_EP_1_IN(){
+	 
+	uint8_t len = 8;
+	uint8_t lenCnt = 8;
+
+	while(lenCnt--) {
+		if(!CBUF_IsEmpty(test_Q)){
+			CBUF_AdvancePopIdx(test_Q);
+			interruptBuffer[len-lenCnt-1] = CBUF_Get(test_Q, 0);
+		} else {
+			len -= lenCnt - 1;
+			break;
+		}
+	}
+	 
+	usbSetInterrupt(interruptBuffer, len);
+
+}
+
 int main(void) {
+	
+	odDebugInit();
+
     /* init timer */
     clockInit();
 
@@ -465,6 +484,9 @@ int main(void) {
     sei();
     for (;;) {
         usbPoll();
+		if (usbInterruptIsReady()) {
+			HID_EP_1_IN();
+		}	
     }
     return 0;
 }
