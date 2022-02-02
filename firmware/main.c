@@ -3,7 +3,7 @@
  *
  * Thomas Fischl <tfischl@gmx.de>
  * 2020 fixes and tweaks by Ralph Doncaster (Nerd Ralph)
- * 2021 Basic HID UART by Dimitrios Chr. Ioannidis
+ * 2021 WCID support and basic HID UART by Dimitrios Chr. Ioannidis
  *
  * License........: GNU GPL v2 (see Readme.txt)
  * Target.........: ATMega8 at 12 MHz
@@ -125,25 +125,23 @@ volatile struct
 	
 */
      
-USB_PUBLIC usbMsgLen_t usbFunctionDescriptor(struct usbRequest *rq) {
+usbMsgLen_t usbFunctionDescriptor(struct usbRequest *rq) {
 
-  // DBG1(0xFD, (uchar *)rq, sizeof(usbRequest_t));
+    DBG1(0xFD, (uchar *)rq, sizeof(usbRequest_t));
 
-	 usbMsgLen_t  len = 0;
+	usbMsgLen_t len = 0;
 	 
 	/* string (3) request at index 0xEE, is an OS string descriptor request */   
   
-	if(rq->wValue.bytes[1] == USBDESCR_STRING) {
-		if(rq->wValue.bytes[0] == MS_1_0_OS_DESCRIPTOR_INDEX) {
+	if((rq->wValue.bytes[1] == USBDESCR_STRING) && (rq->wValue.bytes[0] == MS_1_0_OS_DESCRIPTOR_INDEX)) {
 			usbMsgPtr = (usbMsgPtr_t)&MS_1_0_OS_STRING_DESCRIPTOR;
 			len = sizeof(MS_1_0_OS_STRING_DESCRIPTOR);	 
-		}
 	}
 	
 	return len;
 };
 
-USB_PUBLIC usbMsgLen_t usbFunctionSetup(uchar data[8]) {
+usbMsgLen_t usbFunctionSetup(uchar data[8]) {
 
 	DBG1(0xF5, data, 8);
 	
@@ -289,9 +287,17 @@ USB_PUBLIC usbMsgLen_t usbFunctionSetup(uchar data[8]) {
         prog_state = PROG_STATE_TPI_WRITE;
         len = 0xff; /* multiple out */
     
+	} else if((rq->bmRequestType == USBRQ_TYPE_VENDOR) && (rq->bRequest == USBASP_FUNC_GETCAPABILITIES)) {
+		 replyBuffer[0] = USBASP_CAP_0_TPI;
+		 replyBuffer[1] = 0;
+		 replyBuffer[2] = 0;
+		 replyBuffer[3] = 0;
+		 //usbMsgPtr = replyBuffer;
+		 len = 4;
+	 
     /* Handle the OS feature request associated with the MS Vendor Code
      we replied earlier in the OS String Descriptor request. See usbFunctionDescriptor. */
-    } else if(rq->bmRequestType == REQUEST_GET_VENDOR_CUSTOM) {
+	} else if (rq->bmRequestType == REQUEST_GET_VENDOR_CUSTOM) {
 		if((rq->bRequest == MS_1_0_VENDOR_CODE) &&
 			(rq->wIndex.bytes[0] == MS_1_0_EXTEND_COMPAT_ID_FEATURE_INDEX)) {
 				
@@ -300,11 +306,9 @@ USB_PUBLIC usbMsgLen_t usbFunctionSetup(uchar data[8]) {
 				usbMsgFlags = USB_FLG_MSGPTR_IS_ROM;
 				usbMsgPtr = (usbMsgPtr_t)&MS_1_0_OS_EXTENDED_COMPAT_ID_FEATURE;
 				return sizeof(MS_1_0_OS_EXTENDED_COMPAT_ID_FEATURE);
-      }
-      
-      return 0;
-	  
-    } else if(rq->bmRequestType == REQUEST_GET_MS_1_0_EXTEND_PROPERTIES) {
+		}
+      	
+    } else if (rq->bmRequestType == REQUEST_GET_MS_1_0_EXTEND_PROPERTIES) {
 		if((rq->bRequest == MS_1_0_VENDOR_CODE) &&
 			(rq->wIndex.bytes[0] == MS_1_0_EXTEND_PROPERTIES_FEATURE_INDEX)) {
 
@@ -320,17 +324,17 @@ USB_PUBLIC usbMsgLen_t usbFunctionSetup(uchar data[8]) {
 		 }
 		 
 		 return 0;
-		 
-	 } 
-		
+	 } 	 	
 
     usbMsgPtr = replyBuffer;
 
     return len;
 }
 
-USB_PUBLIC uchar usbFunctionRead(uchar *data, uchar len) {
+uchar usbFunctionRead(uchar *data, uchar len) {
 
+	DBG1(0xF6, data, len);
+	
     uchar i;
 
     /* check if programmer is in correct read state */
@@ -365,8 +369,10 @@ USB_PUBLIC uchar usbFunctionRead(uchar *data, uchar len) {
     return len;
 }
 
-USB_PUBLIC uchar usbFunctionWrite(uchar *data, uchar len) {
+uchar usbFunctionWrite(uchar *data, uchar len) {
 
+	DBG1(0xF7, data, 8);
+	
     uchar retVal = 0;
     uchar i;
 
@@ -432,7 +438,7 @@ USB_PUBLIC uchar usbFunctionWrite(uchar *data, uchar len) {
     return retVal;
 }
 
-USB_PUBLIC void usbFunctionWriteOut(uchar *data, uchar len){
+void usbFunctionWriteOut(uchar *data, uchar len){
 	 
 	DBG1(0x3F, data, len);
 	 
@@ -465,8 +471,9 @@ void HID_EP_1_IN(){
 
 int main(void) {
 	
+	/* enable debug if DEBUG_LEVEL > 0 */
 	odDebugInit();
-
+	
     /* init timer */
     clockInit();
 
@@ -490,4 +497,3 @@ int main(void) {
     }
     return 0;
 }
-
