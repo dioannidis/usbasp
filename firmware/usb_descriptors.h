@@ -80,7 +80,7 @@ PROGMEM const char usbDescriptorConfiguration[] = {
 	0x03,													/* USB_CFG_INTERFACE_CLASS */
 	0,													    /* USB_CFG_INTERFACE_SUBCLASS */
 	0,														/* USB_CFG_INTERFACE_PROTOCOL */
-	4,														/* string index for interface */
+	2,														/* string index for interface */
 
 	9,														/* sizeof(usbDescrInterface): length of descriptor in bytes */
 	USBDESCR_HID,											/* descriptor type */
