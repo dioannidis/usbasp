@@ -40,116 +40,120 @@ static unsigned int prog_pagesize;
 static uchar prog_blockflags;
 static uchar prog_pagecounter;
 
-#define test_Q_SIZE	128
+#define test_Q_SIZE 128
 
 volatile struct
 {
-	uint8_t	m_getIdx;
-	uint8_t	m_putIdx;
-	uint8_t	m_entry[test_Q_SIZE];
+    uint8_t m_getIdx;
+    uint8_t m_putIdx;
+    uint8_t m_entry[test_Q_SIZE];
 } test_Q;
 
 /* USBasp default winusb driver for Windows.
 
-   Based on the hard work by Marius Greuel @mariusgreuel ( https://github.com/mariusgreuel/USBasp ).
-   This is a non intrusive version, using an unaltered V-USB with no changes in it's usbdrv code.
+    Based on the hard work by Marius Greuel @mariusgreuel ( https://github.com/mariusgreuel/USBasp ).
+    This is a non intrusive version, using an unaltered V-USB with no changes in it's usbdrv code.
 
-   To avoid using driver installation (Zadig, libusb) on Windows and use by default
-   the winusb default driver for USBasp, we need to use OS feature descriptors. 
-   All USB 2.0 devices, when they are enumerated for the first time, Windows asks if 
-   there is an OS feature descriptor by sending a specific standard GET_DESCRIPTOR request
-   with the format :
-   
-   --------------------------------------------------------------------------------------------------
-   |	bmRequestType	|	bRequest		|	wValue	|	wIndex	|	wLength	|	Data			|
-   --------------------------------------------------------------------------------------------------
-   |	1000 0000B		|	GET_DESCRIPTOR	|	0x03EE	|	0x0000	|	0x12	|	Returned string	|
-   --------------------------------------------------------------------------------------------------
-   
-   It asks if there is a specific string descriptor at index 0xEE. Because this string 
-   descriptor request, is not by default handled by the V-USB, we change the USB_CFG_DESCR_PROPS_UNKNOWN
-   to be dynamic (USB_PROP_IS_DYNAMIC). This effectively tell the V-USB that for every 
-   unknown string index request to call the usbFunctionDescriptor function.
-   
-   usbFunctionDescriptor function returns an OS string descriptor using the version 1.00 format 
-   which has a fixed length of 18 bytes, with a structure as shown in the following table :
+    To avoid using driver installation (Zadig, libusb) on Windows and use by default
+    the winusb default driver for USBasp, we need to use OS feature descriptors. 
+    All USB 2.0 devices, when they are enumerated for the first time, Windows asks if 
+    there is an OS feature descriptor by sending a specific standard GET_DESCRIPTOR request
+    with the format :
 
-   --------------------------------------------------------------------------
-   |	Length	|	Type	|	Signature	|	MS Vendor Code	|	Pad		|
-   --------------------------------------------------------------------------
-   |	0x12	|	0x03	|	MSFT100		|	unsigned byte	|	0x00	|
-   --------------------------------------------------------------------------
-   
-	Length: An unsigned byte and MUST be set to 0x12.
+    --------------------------------------------------------------------------------------------------
+    |    bmRequestType   |   bRequest        |   wValue  |   wIndex  |   wLength |   Data            |
+    --------------------------------------------------------------------------------------------------
+    |    1000 0000B      |   GET_DESCRIPTOR  |   0x03EE  |   0x0000  |   0x12    |   Returned string |
+    --------------------------------------------------------------------------------------------------
 
-	Type: An unsigned byte and MUST be set to 0x03.
+    It asks if there is a specific string descriptor at index 0xEE. Because this string 
+    descriptor request, is not by default handled by the V-USB, we change the USB_CFG_DESCR_PROPS_UNKNOWN
+    to be dynamic (USB_PROP_IS_DYNAMIC). This effectively tell the V-USB that for every 
+    unknown string index request to call the usbFunctionDescriptor function.
 
-	Signature: A Unicode string and MUST be set to "MSFT100".
+    usbFunctionDescriptor function returns an OS string descriptor using the version 1.00 format 
+    which has a fixed length of 18 bytes, with a structure as shown in the following table :
 
-	MS Vendor Code: An unsigned byte, it will be used to retrieve associated feature descriptors.
+    --------------------------------------------------------------------------
+    |    Length  |   Type    |   Signature   |   MS Vendor Code  |   Pad     |
+    --------------------------------------------------------------------------
+    |    0x12    |   0x03    |   MSFT100     |   unsigned byte   |   0x00    |
+    --------------------------------------------------------------------------
 
-	Pad: An unsigned byte and MUST be set to 0x00.
+    Length: An unsigned byte and MUST be set to 0x12.
+
+    Type: An unsigned byte and MUST be set to 0x03.
+
+    Signature: A Unicode string and MUST be set to "MSFT100".
+
+    MS Vendor Code: An unsigned byte, it will be used to retrieve associated feature descriptors.
+
+    Pad: An unsigned byte and MUST be set to 0x00.
 
     The Signature field contains a Unicode character array that identifies the descriptor as an 
-	OS string descriptor and includes the version number. For version 1.00, this array must be set 
-	to "MSFT100" (0x4D00 0x5300 0x4600 0x5400 0x3100 0x3000 0x3000).
+    OS string descriptor and includes the version number. For version 1.00, this array must be set 
+    to "MSFT100" (0x4D00 0x5300 0x4600 0x5400 0x3100 0x3000 0x3000).
 
     The MS VendorCode field is used to retrieve the associated feature descriptors. This code is 
-	used as Request field in TS_URB_CONTROL_VENDOR_OR_CLASS_REQUEST section 2.2.9.12.
-	
-	In usbFunctionSetup we handle the feature request associated to MS Vendor Code we replied earlier 
-	and send an Extended Compat ID with the information that we want Windows to load the winusb default driver.
+    used as Request field in TS_URB_CONTROL_VENDOR_OR_CLASS_REQUEST section 2.2.9.12.
+    
+    In usbFunctionSetup we handle the feature request associated to MS Vendor Code we replied earlier 
+    and send an Extended Compat ID with the information that we want Windows to load the winusb default driver.
 
     For More information see
 
-	https://docs.microsoft.com/en-us/windows-hardware/drivers/usbcon/microsoft-defined-usb-descriptors
-	https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpeusb/c2f351f9-84d2-4a1b-9fe3-a6ca195f84d0
-	
-	
-	!!! Notice !!!
-	
-	"After the operating system requests a Microsoft OS String Descriptor from a device, it creates the following registry key:
+    https://docs.microsoft.com/en-us/windows-hardware/drivers/usbcon/microsoft-defined-usb-descriptors
+    https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpeusb/c2f351f9-84d2-4a1b-9fe3-a6ca195f84d0
 
-	HLKM\SYSTEM\CurrentControlSet\Control\UsbFlags\vvvvpppprrrrr
 
-	The operating system creates a registry entry, named osvc, under this registry key that indicates 
-	whether the device supports Microsoft OS Descriptors. If the device does not provide a valid response 
-	the first time that the operating system queries it for a Microsoft OS String Descriptor, 
-	the operating system will make no further requests for that descriptor."
-	
-	If your firmware doesn't work please delete the registry key as stated above to retrigger a query from Windows.
-	
-	i.e. if your firmware has a device version of 0x07, 0x01 then there will be a registry key with the name :
-	
-	Computer\HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\usbflags\16C005DC0107
-	
+    !!! Notice !!!
+
+    "After the operating system requests a Microsoft OS String Descriptor from a device, it creates the following registry key:
+
+    HLKM\SYSTEM\CurrentControlSet\Control\UsbFlags\vvvvpppprrrrr
+
+    The operating system creates a registry entry, named osvc, under this registry key that indicates 
+    whether the device supports Microsoft OS Descriptors. If the device does not provide a valid response 
+    the first time that the operating system queries it for a Microsoft OS String Descriptor, 
+    the operating system will make no further requests for that descriptor."
+    
+    If your firmware doesn't work please delete the registry key as stated above to retrigger a query from Windows.
+    
+    i.e. if your firmware has a device version of 0x07, 0x01 then there will be a registry key with the name :
+    
+    Computer\HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\usbflags\16C005DC0107
+    
 */
-     
+
 usbMsgLen_t usbFunctionDescriptor(struct usbRequest *rq) {
 
     DBG1(0xFD, (uchar *)rq, sizeof(usbRequest_t));
 
-	usbMsgLen_t len = 0;
-	 
-	/* string (3) request at index 0xEE, is an OS string descriptor request */   
-  
-	if((rq->wValue.bytes[1] == USBDESCR_STRING) && (rq->wValue.bytes[0] == MS_1_0_OS_DESCRIPTOR_INDEX)) {
-			usbMsgPtr = (usbMsgPtr_t)&MS_1_0_OS_STRING_DESCRIPTOR;
-			len = sizeof(MS_1_0_OS_STRING_DESCRIPTOR);	 
-	}
-	
-	return len;
+    usbMsgLen_t len = 0;
+
+    /* string (3) request at index 0xEE, is an OS string descriptor request */   
+
+    if((rq->wValue.bytes[1] == USBDESCR_STRING) && (rq->wValue.bytes[0] == MS_1_0_OS_DESCRIPTOR_INDEX)) {
+        usbMsgPtr = (usbMsgPtr_t)&MS_1_0_OS_STRING_DESCRIPTOR;
+        len = sizeof(MS_1_0_OS_STRING_DESCRIPTOR);
+
+    }
+
+    return len;
 };
 
 usbMsgLen_t usbFunctionSetup(uchar data[8]) {
 
-	DBG1(0xF5, data, 8);
-	
-    usbMsgLen_t len = 0;
-	usbRequest_t *rq = (usbRequest_t *)data;
+    DBG1(0xF5, data, 8);
 
-    if (data[1] == USBASP_FUNC_CONNECT) {
-	
+    usbMsgLen_t len = 0;
+
+    if ((data[0] & USBRQ_TYPE_MASK) == USBRQ_TYPE_CLASS) {
+        
+        return 0; // Surpress report calls for now.
+        
+    } else if (data[1] == USBASP_FUNC_CONNECT) {
+
         /* set SCK speed */
         ispSetSCKOption(prog_sck);
 
@@ -193,7 +197,7 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
         len = 1;
 
     } else if (data[1] == USBASP_FUNC_WRITEFLASH) {
-
+        
         if (!prog_address_newmode)
             prog_address = (data[3] << 8) | data[2];
 
@@ -247,7 +251,7 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
 
         clockWait(16);
         tpi_init();
-    
+
     } else if (data[1] == USBASP_FUNC_TPI_DISCONNECT) {
 
         tpi_send_byte(TPI_OP_SSTCS(TPISR));
@@ -271,60 +275,57 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
     } else if (data[1] == USBASP_FUNC_TPI_RAWREAD) {
         replyBuffer[0] = tpi_recv_byte();
         len = 1;
-    
+
     } else if (data[1] == USBASP_FUNC_TPI_RAWWRITE) {
         tpi_send_byte(data[2]);
-    
+
     } else if (data[1] == USBASP_FUNC_TPI_READBLOCK) {
         prog_address = (data[3] << 8) | data[2];
         prog_nbytes = (data[7] << 8) | data[6];
         prog_state = PROG_STATE_TPI_READ;
         len = 0xff; /* multiple in */
-    
+
     } else if (data[1] == USBASP_FUNC_TPI_WRITEBLOCK) {
         prog_address = (data[3] << 8) | data[2];
         prog_nbytes = (data[7] << 8) | data[6];
         prog_state = PROG_STATE_TPI_WRITE;
         len = 0xff; /* multiple out */
-    
-	} else if((rq->bmRequestType == USBRQ_TYPE_VENDOR) && (rq->bRequest == USBASP_FUNC_GETCAPABILITIES)) {
-		 replyBuffer[0] = USBASP_CAP_0_TPI;
-		 replyBuffer[1] = 0;
-		 replyBuffer[2] = 0;
-		 replyBuffer[3] = 0;
-		 //usbMsgPtr = replyBuffer;
-		 len = 4;
-	 
-    /* Handle the OS feature request associated with the MS Vendor Code
-     we replied earlier in the OS String Descriptor request. See usbFunctionDescriptor. */
-	} else if (rq->bmRequestType == REQUEST_GET_VENDOR_CUSTOM) {
-		if((rq->bRequest == MS_1_0_VENDOR_CODE) &&
-			(rq->wIndex.bytes[0] == MS_1_0_EXTEND_COMPAT_ID_FEATURE_INDEX)) {
-				
-				/* Send the Extended Compat ID OS feature descriptor, 
-				requesting to load the default winusb driver for us */
-				usbMsgFlags = USB_FLG_MSGPTR_IS_ROM;
-				usbMsgPtr = (usbMsgPtr_t)&MS_1_0_OS_EXTENDED_COMPAT_ID_FEATURE;
-				return sizeof(MS_1_0_OS_EXTENDED_COMPAT_ID_FEATURE);
-		}
-      	
-    } else if (rq->bmRequestType == REQUEST_GET_MS_1_0_EXTEND_PROPERTIES) {
-		if((rq->bRequest == MS_1_0_VENDOR_CODE) &&
-			(rq->wIndex.bytes[0] == MS_1_0_EXTEND_PROPERTIES_FEATURE_INDEX)) {
 
-			 usbMsgFlags = USB_FLG_MSGPTR_IS_ROM;
-			 switch(data[2]) {
-				 case 0:
-					usbMsgPtr = (usbMsgPtr_t)&MS_1_0_OS_EXTENDED_PROPERTIES_FEATURE_INTF0;
-					return sizeof(MS_1_0_OS_EXTENDED_PROPERTIES_FEATURE_INTF0);
-				 break;
-				 default:
-				 break;
-			 }
-		 }
-		 
-		 return 0;
-	 } 	 	
+    } else if(data[1] == USBASP_FUNC_GETCAPABILITIES) {
+         replyBuffer[0] = USBASP_CAP_0_TPI;
+         replyBuffer[1] = 0;
+         replyBuffer[2] = 0;
+         replyBuffer[3] = 0;
+         len = 4;
+
+    /* Handle the OS feature request associated with the MS Vendor Code
+    we replied earlier in the OS String Descriptor request. See usbFunctionDescriptor. */
+    } else if (data[0] == REQUEST_GET_VENDOR_CUSTOM) {
+        if((data[1] == MS_1_0_VENDOR_CODE) &&
+            (data[4] == MS_1_0_EXTEND_COMPAT_ID_FEATURE_INDEX)) {
+
+                /* Send the Extended Compat ID OS feature descriptor, 
+                requesting to load the default winusb driver for us */
+                usbMsgFlags = USB_FLG_MSGPTR_IS_ROM;
+                usbMsgPtr = (usbMsgPtr_t)&MS_1_0_OS_EXTENDED_COMPAT_ID_FEATURE;
+                return sizeof(MS_1_0_OS_EXTENDED_COMPAT_ID_FEATURE);
+        }
+
+    } else if (data[0] == REQUEST_GET_MS_1_0_EXTEND_PROPERTIES) {
+        if((data[1] == MS_1_0_VENDOR_CODE) &&
+            (data[4] == MS_1_0_EXTEND_PROPERTIES_FEATURE_INDEX)) {
+
+             usbMsgFlags = USB_FLG_MSGPTR_IS_ROM;
+             switch(data[2]) {
+                 case 0:
+                    usbMsgPtr = (usbMsgPtr_t)&MS_1_0_OS_EXTENDED_PROPERTIES_FEATURE_INTF0;
+                    return sizeof(MS_1_0_OS_EXTENDED_PROPERTIES_FEATURE_INTF0);
+                 break;
+                 default:
+                 break;
+             }
+         }
+     }
 
     usbMsgPtr = replyBuffer;
 
@@ -333,8 +334,6 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
 
 uchar usbFunctionRead(uchar *data, uchar len) {
 
-	DBG1(0xF6, data, len);
-	
     uchar i;
 
     /* check if programmer is in correct read state */
@@ -371,8 +370,6 @@ uchar usbFunctionRead(uchar *data, uchar len) {
 
 uchar usbFunctionWrite(uchar *data, uchar len) {
 
-	DBG1(0xF7, data, 8);
-	
     uchar retVal = 0;
     uchar i;
 
@@ -439,41 +436,41 @@ uchar usbFunctionWrite(uchar *data, uchar len) {
 }
 
 void usbFunctionWriteOut(uchar *data, uchar len){
-	 
-	DBG1(0x3F, data, len);
-	 
-	while(len--){
-		if (!CBUF_IsFull(test_Q)){
-			CBUF_AdvancePushIdx(test_Q);
-			*CBUF_GetPushEntryPtr(test_Q) = *data++;
-		}
-	} 
+     
+    DBG1(0x3F, data, len);
+     
+    while(len--){
+        if (!CBUF_IsFull(test_Q)){
+            CBUF_AdvancePushIdx(test_Q);
+            *CBUF_GetPushEntryPtr(test_Q) = *data++;
+        }
+    } 
 }
 
 void HID_EP_1_IN(){
-	 
-	uint8_t len = 8;
-	uint8_t lenCnt = 8;
 
-	while(lenCnt--) {
-		if(!CBUF_IsEmpty(test_Q)){
-			CBUF_AdvancePopIdx(test_Q);
-			interruptBuffer[len-lenCnt-1] = CBUF_Get(test_Q, 0);
-		} else {
-			len -= lenCnt - 1;
-			break;
-		}
-	}
-	 
-	usbSetInterrupt(interruptBuffer, len);
+    uint8_t len = 8;
+    uint8_t lenCnt = 8;
+
+    while(lenCnt--) {
+        if(!CBUF_IsEmpty(test_Q)){
+            CBUF_AdvancePopIdx(test_Q);
+            interruptBuffer[len-lenCnt-1] = CBUF_Get(test_Q, 0);
+        } else {
+            len -= lenCnt - 1;
+            break;
+        }
+    }
+
+    usbSetInterrupt(interruptBuffer, len);
 
 }
 
 int main(void) {
-	
-	/* enable debug if DEBUG_LEVEL > 0 */
-	odDebugInit();
-	
+
+    /* enable debug if DEBUG_LEVEL > 0 */
+    odDebugInit();
+
     /* init timer */
     clockInit();
 
@@ -491,9 +488,9 @@ int main(void) {
     sei();
     for (;;) {
         usbPoll();
-		if (usbInterruptIsReady()) {
-			HID_EP_1_IN();
-		}	
+        if (usbInterruptIsReady()) {
+            HID_EP_1_IN();
+        }   
     }
     return 0;
 }
