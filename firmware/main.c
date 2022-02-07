@@ -488,8 +488,8 @@ int main(void) {
     /* all USB and ISP pins inputs to end USB reset */
     DDRB = 0;
 
-	PORTD|=(1<<0); // pullup on Rx pin.
-	DDRD&=~(1<<0); // Rx as input too.
+    PORTD|=(1<<0); // pullup on Rx pin.
+    DDRD&=~(1<<0); // Rx as input too.
                 
     /* USBasp active */
     ledGreenOn();
