@@ -37,7 +37,7 @@ help:
 
 COMPILE = avr-gcc -Wall -Wextra -Os -Iusbdrv -I. -mmcu=$(TARGET) -DF_CPU=12000000 # -DDEBUG_LEVEL=2
 
-OBJECTS = usbdrv/usbdrv.o usbdrv/usbdrvasm.o usbdrv/oddebug.o isp.o clock.o tpi.o main.o
+OBJECTS = usbdrv/usbdrv.o usbdrv/usbdrvasm.o usbdrv/oddebug.o isp.o clock.o tpi.o main.o uart.o
 
 .c.o:
 	$(COMPILE) -c $< -o $@

@@ -20,7 +20,7 @@
 #include "oddebug.h"
 #include "usbasp.h"
 #include "usbdrv.h"
-#include "CBUF.h"
+#include "uart.h"
 #include "usb_descriptors.h"
 #include "isp.h"
 #include "clock.h"
@@ -39,15 +39,6 @@ static unsigned int prog_nbytes = 0;
 static unsigned int prog_pagesize;
 static uchar prog_blockflags;
 static uchar prog_pagecounter;
-
-#define test_Q_SIZE 128
-
-volatile struct
-{
-    uint8_t m_getIdx;
-    uint8_t m_putIdx;
-    uint8_t m_entry[test_Q_SIZE];
-} test_Q;
 
 /* USBasp default winusb driver for Windows.
 
@@ -153,6 +144,7 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
         return 0; // Surpress report calls for now.
         
     } else if (data[1] == USBASP_FUNC_CONNECT) {
+		uart_disable(); // make it not interefere.
 
         /* set SCK speed */
         ispSetSCKOption(prog_sck);
@@ -292,12 +284,23 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
         len = 0xff; /* multiple out */
 
     } else if(data[1] == USBASP_FUNC_GETCAPABILITIES) {
-         replyBuffer[0] = USBASP_CAP_0_TPI;
+         replyBuffer[0] = USBASP_CAP_0_TPI | USBASP_CAP_6_UART;
          replyBuffer[1] = 0;
          replyBuffer[2] = 0;
          replyBuffer[3] = 0;
          len = 4;
 
+	// UART from now on:
+	} else if(data[1]==USBASP_FUNC_UART_CONFIG){
+		uint16_t baud=(data[3]<<8)|data[2];
+		uint8_t par  = data[4] & USBASP_UART_PARITY_MASK;
+		uint8_t stop = data[4] & USBASP_UART_STOP_MASK;
+		uint8_t bytes= data[4] & USBASP_UART_BYTES_MASK;
+		uart_config(baud, par, stop, bytes);
+        
+	} else if(data[1]==USBASP_FUNC_UART_DISABLE){
+		uart_disable();
+	
     /* Handle the OS feature request associated with the MS Vendor Code
     we replied earlier in the OS String Descriptor request. See usbFunctionDescriptor. */
     } else if (data[0] == REQUEST_GET_VENDOR_CUSTOM) {
@@ -435,34 +438,39 @@ uchar usbFunctionWrite(uchar *data, uchar len) {
     return retVal;
 }
 
+/* Host to device. */
 void usbFunctionWriteOut(uchar *data, uchar len){
      
-    DBG1(0x3F, data, len);
-     
+    DBG1(0x3F, data, len);    
+    
     while(len--){
-        if (!CBUF_IsFull(test_Q)){
-            CBUF_AdvancePushIdx(test_Q);
-            *CBUF_GetPushEntryPtr(test_Q) = *data++;
+        if (!CBUF_IsFull(tx_Q)){
+            CBUF_AdvancePushIdx(tx_Q);
+            *CBUF_GetPushEntryPtr(tx_Q) = *data++;
         }
-    } 
+    }
+
+    UCSRB|=(1<<UDRIE);    
+
 }
 
+/* Device to host. */
 void HID_EP_1_IN(){
-
+       
     uint8_t len = 8;
     uint8_t lenCnt = 8;
 
     while(lenCnt--) {
-        if(!CBUF_IsEmpty(test_Q)){
-            CBUF_AdvancePopIdx(test_Q);
-            interruptBuffer[len-lenCnt-1] = CBUF_Get(test_Q, 0);
-        } else {
-            len -= lenCnt - 1;
-            break;
+        if(!CBUF_IsEmpty(rx_Q)){
+            CBUF_AdvancePopIdx(rx_Q);
+            interruptBuffer[len-lenCnt] = CBUF_Get(rx_Q, 0);
+       // } else {
+            // // len -= lenCnt - 1;
+            // break;
         }
     }
 
-    usbSetInterrupt(interruptBuffer, len);
+    usbSetInterrupt(interruptBuffer, len - lenCnt + 1);
 
 }
 
@@ -473,24 +481,30 @@ int main(void) {
 
     /* init timer */
     clockInit();
-
+       
     /* output SE0 for USB reset */
     DDRB = ~0;
     clockWait(10 / 0.320);              /* 10ms */
     /* all USB and ISP pins inputs to end USB reset */
     DDRB = 0;
 
+	PORTD|=(1<<0); // pullup on Rx pin.
+	DDRD&=~(1<<0); // Rx as input too.
+                
     /* USBasp active */
     ledGreenOn();
 
     /* main event loop */
     usbInit();
+        
     sei();
     for (;;) {
         usbPoll();
+        
         if (usbInterruptIsReady()) {
-            HID_EP_1_IN();
-        }   
+            HID_EP_1_IN();        
+        }
+                
     }
     return 0;
 }
