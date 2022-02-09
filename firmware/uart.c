@@ -1,3 +1,4 @@
+#include "usbasp.h"
 #include "uart.h"
 #include "cbuf.h"
 
@@ -7,40 +8,35 @@
 
 void __vector_usart_rxc_wrapped() __attribute__ ((signal));
 void __vector_usart_rxc_wrapped(){
-   	uint8_t c=UDR;
     if (!CBUF_IsFull(rx_Q)){
-        CBUF_AdvancePushIdx(rx_Q);
-        *CBUF_GetPushEntryPtr(rx_Q) = c;
+      CBUF_Push(rx_Q, EEDR);
     }
-   	UCSRB|=1<<RXCIE;
 }
 
-/* Save uart byte to unused register EEDR in one cycle */
+/*
+    As we don't use EEPROM we use EEDR to store UDR value.
+    No need to disable RXCIE interrupt. Total 4 cycles.
+*/
 ISR(USART_RXC_vect, ISR_NAKED){
-    // __asm__ volatile("in  __tmp_reg__, %0 \n"
-    // "out %1, __tmp_reg__ \n"
-    // "rjmp __vector_usart_rxc_wrapped \n"
-    // ::"I"(_SFR_IO_ADDR(UDR)),"I"(_SFR_IO_ADDR(EEDR)));
-	// Disable this interrupt by clearing its Interrupt Enable flag.
-	__asm__ volatile("cbi %0, %1"::
-			"I"(_SFR_IO_ADDR(UCSRB)),"I"(RXCIE));
-	__asm__ volatile("sei"::);
-	__asm__ volatile("rjmp __vector_usart_rxc_wrapped"::);
+    __asm__ volatile(   "in  __tmp_reg__, %0 \n"                        // 1 cycle
+                        "out %1, __tmp_reg__ \n"                        // 1 cycle
+                        "rjmp __vector_usart_rxc_wrapped \n"            // 2 cycles
+                        ::"i"(_SFR_IO_ADDR(UDR)),"i"(_SFR_IO_ADDR(EEDR))
+                    );
 }
 
 void __vector_usart_udre_wrapped() __attribute__ ((signal));
 void __vector_usart_udre_wrapped(){
     if(!CBUF_IsEmpty(tx_Q)){
-        CBUF_AdvancePopIdx(tx_Q);
-        UDR=CBUF_Get(tx_Q, 0);
+        UDR=CBUF_Pop(tx_Q);
         UCSRB|=(1<<UDRIE); // Enable this interrupt back.
     }
 }
 
 ISR(USART_UDRE_vect, ISR_NAKED){
     // Disable this interrupt by clearing its Interrupt Enable flag.
-    __asm__ volatile("cbi %0, %1"::
-    "I"(_SFR_IO_ADDR(UCSRB)),"I"(UDRIE));
+    __asm__ volatile(   "cbi %0, %1"::
+                        "I"(_SFR_IO_ADDR(UCSRB)),"I"(UDRIE));
     // Now we can enable interrupts without infinite recursion.
     __asm__ volatile("sei"::);
     // Jump into the actual handler.
@@ -52,6 +48,7 @@ void uart_disable(){
 }
 
 void uart_config(uint16_t baud, uint8_t par, uint8_t stop, uint8_t bytes){
+
     uart_disable();
 
     CBUF_Init(tx_Q);
