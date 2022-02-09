@@ -1,7 +1,6 @@
 #ifndef UART_H
 #define UART_H
 
-#include "usbasp.h"
 #include "cbuf.h"
 #include <stdint.h>
 
