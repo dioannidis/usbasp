@@ -440,38 +440,38 @@ uchar usbFunctionWrite(uchar *data, uchar len) {
 
 /* Host to device. */
 void usbFunctionWriteOut(uchar *data, uchar len){
-     
-    DBG1(0x3F, data, len);    
-    
+
+    DBG1(0x3F, data, len);
+
     while(len--){
         if (!CBUF_IsFull(tx_Q)){
-            CBUF_AdvancePushIdx(tx_Q);
-            *CBUF_GetPushEntryPtr(tx_Q) = *data++;
-        }
+            CBUF_Push(tx_Q, *data++);
+        } else { break; }
     }
 
-    UCSRB|=(1<<UDRIE);    
-
+    UCSRB|=(1<<UDRIE);
 }
 
 /* Device to host. */
 void HID_EP_1_IN(){
-       
-    uint8_t len = 8;
-    uint8_t lenCnt = 8;
+/*
+    AFAIU, interrupt requests must be exactly 8 bytes long for USB 1.1 .
+    As we must inform the receiver how many bytes we return, we store
+    the length in the last byte. Effectively loosing 1 byte.
 
-    while(lenCnt--) {
-        if(!CBUF_IsEmpty(rx_Q)){
-            CBUF_AdvancePopIdx(rx_Q);
-            interruptBuffer[len-lenCnt] = CBUF_Get(rx_Q, 0);
-       // } else {
-            // // len -= lenCnt - 1;
-            // break;
-        }
+    TODO: Fix this !
+
+*/
+    /* As we don't use EEPROM use the EEAR register as variable */
+    EEAR = 0;
+    
+    while((!(CBUF_IsEmpty(rx_Q))) && (EEAR != 7)){
+        interruptBuffer[EEAR++] = CBUF_Get(rx_Q, 0);
+        CBUF_AdvancePopIdx(rx_Q);
     }
 
-    usbSetInterrupt(interruptBuffer, len - lenCnt + 1);
-
+    interruptBuffer[7] = EEAR;
+    usbSetInterrupt(interruptBuffer, sizeof(interruptBuffer));
 }
 
 int main(void) {
@@ -487,9 +487,6 @@ int main(void) {
     clockWait(10 / 0.320);              /* 10ms */
     /* all USB and ISP pins inputs to end USB reset */
     DDRB = 0;
-
-    PORTD|=(1<<0); // pullup on Rx pin.
-    DDRD&=~(1<<0); // Rx as input too.
                 
     /* USBasp active */
     ledGreenOn();
@@ -499,12 +496,10 @@ int main(void) {
         
     sei();
     for (;;) {
-        usbPoll();
-        
+        usbPoll();       
         if (usbInterruptIsReady()) {
-            HID_EP_1_IN();        
-        }
-                
+            HID_EP_1_IN();
+        }        
     }
     return 0;
 }
