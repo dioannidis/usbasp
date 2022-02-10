@@ -440,11 +440,40 @@ uchar usbFunctionWrite(uchar *data, uchar len) {
     return retVal;
 }
 
+/*
+ *
+ *  As the input and output report are 8 bytes, we store 
+ *  the actual serial bytes count at the last byte. The 
+ *  remaining bytes are ignored as garbage. 
+ *
+ *  i.e.
+ *
+ *  Input or Output Report 
+ *  
+ *  0x55,0x34,0x00,0x00,0x00,0x00,0x00,0x02 -> Actual serial bytes 2 : 0x55,0x34
+ *  
+ *  0x00,0x34,0x00,0x66,0x32,0x36,0x00,0x04 -> Actual serial bytes 4 : 0x00,0x34,0x00,0x66
+ *  
+ */
+
+
 /* Host to device. */
 void usbFunctionWriteOut(uchar *data, uchar len){
 
     DBG1(0x3F, data, len);
 
+/*
+    AFAIU, interrupt out must be exactly 8 bytes long for USB 1.1 .
+    As we must know how many bytes of the report are actual bytes 
+    sended, the length is in the last byte. Effectively loosing 1 byte.
+
+    TODO: Fix this !
+
+*/
+
+    /* Actual serial bytes in output report */
+    len = data[7];
+    
     while(len--){
         if (!CBUF_IsFull(tx_Q)){
             CBUF_Push(tx_Q, *data++);
@@ -458,8 +487,8 @@ void usbFunctionWriteOut(uchar *data, uchar len){
 void HID_EP_1_IN(){
 /*
     AFAIU, interrupt requests must be exactly 8 bytes long for USB 1.1 .
-    As we must inform the receiver how many bytes we return, we store
-    the length in the last byte. Effectively loosing 1 byte.
+    As we must inform the receiver how many serial bytes we return, we 
+    store the actual length in the last byte. Effectively loosing 1 byte.
 
     TODO: Fix this !
 
@@ -472,6 +501,7 @@ void HID_EP_1_IN(){
         CBUF_AdvancePopIdx(rx_Q);
     }
 
+    /* Actual serial bytes in input report */
     interruptBuffer[7] = EEAR;
     usbSetInterrupt(interruptBuffer, sizeof(interruptBuffer));
 }
