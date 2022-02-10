@@ -146,7 +146,7 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
         return 0; // Surpress report calls for now.
         
     } else if (data[1] == USBASP_FUNC_CONNECT) {
-		uart_disable(); // make it not interefere.
+        uart_disable(); // make it not interefere.
 
         /* set SCK speed */
         ispSetSCKOption(prog_sck);
@@ -292,17 +292,17 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
          replyBuffer[3] = 0;
          len = 4;
 
-	// UART from now on:
-	} else if(data[1]==USBASP_FUNC_UART_CONFIG){
-		uint16_t baud=(data[3]<<8)|data[2];
-		uint8_t par  = data[4] & USBASP_UART_PARITY_MASK;
-		uint8_t stop = data[4] & USBASP_UART_STOP_MASK;
-		uint8_t bytes= data[4] & USBASP_UART_BYTES_MASK;
-		uart_config(baud, par, stop, bytes);
+    // UART from now on:
+    } else if(data[1]==USBASP_FUNC_UART_CONFIG){
+        uint16_t baud=(data[3]<<8)|data[2];
+        uint8_t par  = data[4] & USBASP_UART_PARITY_MASK;
+        uint8_t stop = data[4] & USBASP_UART_STOP_MASK;
+        uint8_t bytes= data[4] & USBASP_UART_BYTES_MASK;
+        uart_config(baud, par, stop, bytes);
         
-	} else if(data[1]==USBASP_FUNC_UART_DISABLE){
-		uart_disable();
-	
+    } else if(data[1]==USBASP_FUNC_UART_DISABLE){
+        uart_disable();
+    
     /* Handle the OS feature request associated with the MS Vendor Code
     we replied earlier in the OS String Descriptor request. See usbFunctionDescriptor. */
     } else if (data[0] == REQUEST_GET_VENDOR_CUSTOM) {
