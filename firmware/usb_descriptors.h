@@ -1,11 +1,11 @@
 ﻿/* Name: usb_descriptors.h
- * Project: V-USB WCID
- * Author: Dimitrios Chr. Ioannidis
- * Creation Date: 15/6/2021
+ *
+ * 2018 WCID support by Marius Greuel ( https://github.com/mariusgreuel )
+ * 2022 Composite WCID and HID by Dimitrios Chr. Ioannidis ( d.ioannidis@nephelae.eu )
+ *
  * Tabsize: 4
- * Copyright: Dimitrios Chr. Ioannidis ( d.ioannidis@nephelae.eu )
- * License: GNU GPL v2 (see License.txt), GNU GPL v3
- */ 
+ * License: GNU GPL v2 (see Readme.txt)
+ */
 
 #ifndef __usb_descriptors_h_included__
 #define __usb_descriptors_h_included__

@@ -1,7 +1,19 @@
+/* Name: uart.h
+ *
+ * UART support 
+ *
+ * 2016 original implementation Adam Krasuski (https://github.com/akrasuski1)
+ * 2021 tweaks by Dimitrios Chr. Ioannidis ( d.ioannidis@nephelae.eu )
+ *
+ * Tabsize: 4
+ * License: GNU GPL v2 (see Readme.txt)
+ */
+
 #ifndef UART_H
 #define UART_H
 
 #include "cbuf.h"
+#include "usbasp.h"
 #include <stdint.h>
 
 #define rx_Q_SIZE   128

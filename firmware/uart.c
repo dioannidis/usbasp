@@ -1,4 +1,14 @@
-#include "usbasp.h"
+/* Name: uart.c
+ *
+ * UART support 
+ *
+ * 2016 original implementation Adam Krasuski (https://github.com/akrasuski1)
+ * 2021 tweaks by Dimitrios Chr. Ioannidis ( d.ioannidis@nephelae.eu )
+ *
+ * Tabsize: 4
+ * License: GNU GPL v2 (see Readme.txt)
+ */
+ 
 #include "uart.h"
 #include "cbuf.h"
 
@@ -14,8 +24,9 @@ void __vector_usart_rxc_wrapped(){
 }
 
 /*
-    As we don't use EEPROM we use EEDR to store UDR value.
-    No need to disable RXCIE interrupt. Total 4 cycles.
+    As we don't use EEPROM we can use EEDR to store the
+    UDR value. No need to disable RXCIE interrupt. 
+    Total 4 cycles.
 */
 ISR(USART_RXC_vect, ISR_NAKED){
     __asm__ volatile(   "in  __tmp_reg__, %0 \n"                        // 1 cycle
@@ -33,6 +44,9 @@ void __vector_usart_udre_wrapped(){
     }
 }
 
+// This cannot be ISR_NOBLOCK, since UDRE is level sensitive.
+// Therefore, we clear the interrupt manually and then jump
+// into the real handler. USB interrupt delay is about 3 clocks.
 ISR(USART_UDRE_vect, ISR_NAKED){
     // Disable this interrupt by clearing its Interrupt Enable flag.
     __asm__ volatile(   "cbi %0, %1"::

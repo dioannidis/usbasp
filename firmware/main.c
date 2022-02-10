@@ -3,7 +3,9 @@
  *
  * Thomas Fischl <tfischl@gmx.de>
  * 2020 fixes and tweaks by Ralph Doncaster (Nerd Ralph)
- * 2021 WCID support and basic HID UART by Dimitrios Chr. Ioannidis
+ * 2021 WCID support by Dimitrios Chr. Ioannidis ( d.ioannidis@nephelae.eu )
+  *     ( based on Marius Greuel's https://github.com/mariusgreuel/USBasp )
+ * 2022 Composite WCID and HID by Dimitrios Chr. Ioannidis ( d.ioannidis@nephelae.eu )
  *
  * License........: GNU GPL v2 (see Readme.txt)
  * Target.........: ATMega8 at 12 MHz
