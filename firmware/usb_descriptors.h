@@ -12,7 +12,6 @@
 
 #define USBDESCR_IAD                                0x0B
 
-#define REQUEST_GET_VENDOR_CUSTOM                   0xC0
 #define REQUEST_GET_MS_1_0_EXTEND_PROPERTIES        0xC1
 
 #define MS_1_0_OS_DESCRIPTOR_INDEX                  0xEE
@@ -175,7 +174,10 @@ PROGMEM const char usbDescriptorHidReport[] = {
     0x81, 0x02,                     //   INPUT (Data,Var,Abs) 
     0x95, 0x08,                     //   REPORT_COUNT (8) 
     0x09, 0x01,                     //   USAGE (Vendor Usage 1) 
-    0x91, 0x02,                     //   OUTPUT (Data,Var,Abs,Nul) 
+    0x91, 0x02,                     //   OUTPUT (Data,Var,Abs) 
+    0x95, 0x08,                     //   REPORT_COUNT (8) 
+    0x09, 0x01,                     //   USAGE (Vendor Usage 1) 
+    0xB2, 0x02, 0x01,               //   FEATURE (Data,Var,Abs,Buf)
     0xC0                            // END_COLLECTION
 };
 

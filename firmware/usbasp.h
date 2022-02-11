@@ -51,6 +51,7 @@
 #define PROG_STATE_WRITEEEPROM          4
 #define PROG_STATE_TPI_READ             5
 #define PROG_STATE_TPI_WRITE            6
+#define PROG_STATE_SET_REPORT           7
 
 /* Block mode flags */
 #define PROG_BLOCKFLAG_FIRST            1
