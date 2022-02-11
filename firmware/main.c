@@ -31,6 +31,7 @@
 
 static uchar replyBuffer[8];
 static uchar interruptBuffer[8];
+static uchar uartConf_Capabilities_FeatureReport[8] = { 0, 0, 0, 0, USBASP_CAP_0_TPI | USBASP_CAP_6_UART, 0, 0, 0};
 
 static uchar prog_state = PROG_STATE_IDLE;
 uchar prog_sck = USBASP_ISP_SCK_AUTO;
@@ -140,181 +141,167 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
     DBG1(0xF5, data, 8);
 
     usbMsgLen_t len = 0;
-
-    if ((data[0] & USBRQ_TYPE_MASK) == USBRQ_TYPE_CLASS) {
+     
+    if ((data[0] & USBRQ_TYPE_MASK) == USBRQ_TYPE_VENDOR) {
         
-        return 0; // Surpress report calls for now.
+        if (data[1] == USBASP_FUNC_CONNECT) {
+            uart_disable(); // make it not interefere.
+
+            /* set SCK speed */
+            ispSetSCKOption(prog_sck);
+
+            /* set compatibility mode of address delivering */
+            prog_address_newmode = 0;
+
+            ledRedOn();
+            ispConnect();
+
+        } else if (data[1] == USBASP_FUNC_DISCONNECT) {
+            ispDisconnect();
+            ledRedOff();
+
+        } else if (data[1] == USBASP_FUNC_TRANSMIT) {
+            replyBuffer[0] = ispTransmit(data[2]);
+            replyBuffer[1] = ispTransmit(data[3]);
+            replyBuffer[2] = ispTransmit(data[4]);
+            replyBuffer[3] = ispTransmit(data[5]);
+            len = 4;
+
+        } else if (data[1] == USBASP_FUNC_READFLASH) {
+
+            if (!prog_address_newmode)
+                prog_address = (data[3] << 8) | data[2];
+
+            prog_nbytes = (data[7] << 8) | data[6];
+            prog_state = PROG_STATE_READFLASH;
+            len = 0xff; /* multiple in */
+
+        } else if (data[1] == USBASP_FUNC_READEEPROM) {
+
+            if (!prog_address_newmode)
+                prog_address = (data[3] << 8) | data[2];
+
+            prog_nbytes = (data[7] << 8) | data[6];
+            prog_state = PROG_STATE_READEEPROM;
+            len = 0xff; /* multiple in */
+
+        } else if (data[1] == USBASP_FUNC_ENABLEPROG) {
+            replyBuffer[0] = ispEnterProgrammingMode();
+            len = 1;
+
+        } else if (data[1] == USBASP_FUNC_WRITEFLASH) {
+            
+            if (!prog_address_newmode)
+                prog_address = (data[3] << 8) | data[2];
+
+            prog_pagesize = data[4];
+            prog_blockflags = data[5] & 0x0F;
+            prog_pagesize += (((unsigned int) data[5] & 0xF0) << 4);
+            if (prog_blockflags & PROG_BLOCKFLAG_FIRST) {
+                prog_pagecounter = prog_pagesize;
+            }
+            prog_nbytes = (data[7] << 8) | data[6];
+            prog_state = PROG_STATE_WRITEFLASH;
+            len = 0xff; /* multiple out */
+
+        } else if (data[1] == USBASP_FUNC_WRITEEEPROM) {
+
+            if (!prog_address_newmode)
+                prog_address = (data[3] << 8) | data[2];
+
+            prog_pagesize = 0;
+            prog_blockflags = 0;
+            prog_nbytes = (data[7] << 8) | data[6];
+            prog_state = PROG_STATE_WRITEEEPROM;
+            len = 0xff; /* multiple out */
+
+        } else if (data[1] == USBASP_FUNC_SETLONGADDRESS) {
+
+            /* set new mode of address delivering (ignore address delivered in commands) */
+            prog_address_newmode = 1;
+            /* set new address */
+            prog_address = *((unsigned long*) &data[2]);
+
+        } else if (data[1] == USBASP_FUNC_SETISPSCK) {
+
+            /* set sck option */
+            prog_sck = data[2];
+            replyBuffer[0] = 0;
+            len = 1;
+
+        } else if (data[1] == USBASP_FUNC_TPI_CONNECT) {
+            tpi_dly_cnt = data[2] | (data[3] << 8);
+
+            /* RST high */
+            ISP_OUT |= (1 << ISP_RST);
+            ISP_DDR |= (1 << ISP_RST);
+
+            clockWait(3);
+
+            /* RST low */
+            ISP_OUT &= ~(1 << ISP_RST);
+            ledRedOn();
+
+            clockWait(16);
+            tpi_init();
+
+        } else if (data[1] == USBASP_FUNC_TPI_DISCONNECT) {
+
+            tpi_send_byte(TPI_OP_SSTCS(TPISR));
+            tpi_send_byte(0);
+
+            clockWait(10);
+
+            /* pulse RST */
+            ISP_OUT |= (1 << ISP_RST);
+            clockWait(5);
+            ISP_OUT &= ~(1 << ISP_RST);
+            clockWait(5);
+
+            /* set all ISP pins inputs */
+            ISP_DDR &= ~((1 << ISP_RST) | (1 << ISP_SCK) | (1 << ISP_MOSI));
+            /* switch pullups off */
+            ISP_OUT &= ~((1 << ISP_RST) | (1 << ISP_SCK) | (1 << ISP_MOSI));
+
+            ledRedOff();
         
-    } else if (data[1] == USBASP_FUNC_CONNECT) {
-        uart_disable(); // make it not interefere.
+        } else if (data[1] == USBASP_FUNC_TPI_RAWREAD) {
+            replyBuffer[0] = tpi_recv_byte();
+            len = 1;
 
-        /* set SCK speed */
-        ispSetSCKOption(prog_sck);
+        } else if (data[1] == USBASP_FUNC_TPI_RAWWRITE) {
+            tpi_send_byte(data[2]);
 
-        /* set compatibility mode of address delivering */
-        prog_address_newmode = 0;
-
-        ledRedOn();
-        ispConnect();
-
-    } else if (data[1] == USBASP_FUNC_DISCONNECT) {
-        ispDisconnect();
-        ledRedOff();
-
-    } else if (data[1] == USBASP_FUNC_TRANSMIT) {
-        replyBuffer[0] = ispTransmit(data[2]);
-        replyBuffer[1] = ispTransmit(data[3]);
-        replyBuffer[2] = ispTransmit(data[4]);
-        replyBuffer[3] = ispTransmit(data[5]);
-        len = 4;
-
-    } else if (data[1] == USBASP_FUNC_READFLASH) {
-
-        if (!prog_address_newmode)
+        } else if (data[1] == USBASP_FUNC_TPI_READBLOCK) {
             prog_address = (data[3] << 8) | data[2];
+            prog_nbytes = (data[7] << 8) | data[6];
+            prog_state = PROG_STATE_TPI_READ;
+            len = 0xff; /* multiple in */
 
-        prog_nbytes = (data[7] << 8) | data[6];
-        prog_state = PROG_STATE_READFLASH;
-        len = 0xff; /* multiple in */
-
-    } else if (data[1] == USBASP_FUNC_READEEPROM) {
-
-        if (!prog_address_newmode)
+        } else if (data[1] == USBASP_FUNC_TPI_WRITEBLOCK) {
             prog_address = (data[3] << 8) | data[2];
+            prog_nbytes = (data[7] << 8) | data[6];
+            prog_state = PROG_STATE_TPI_WRITE;
+            len = 0xff; /* multiple out */
 
-        prog_nbytes = (data[7] << 8) | data[6];
-        prog_state = PROG_STATE_READEEPROM;
-        len = 0xff; /* multiple in */
+        } else if(data[1] == USBASP_FUNC_GETCAPABILITIES) {
+             replyBuffer[0] = USBASP_CAP_0_TPI | USBASP_CAP_6_UART;
+             replyBuffer[1] = 0;
+             replyBuffer[2] = 0;
+             replyBuffer[3] = 0;
+             len = 4;
 
-    } else if (data[1] == USBASP_FUNC_ENABLEPROG) {
-        replyBuffer[0] = ispEnterProgrammingMode();
-        len = 1;
+        /* Handle the OS feature request associated with the MS Vendor Code
+        we replied earlier in the OS String Descriptor request. See usbFunctionDescriptor. */
+        } else if((data[1] == MS_1_0_VENDOR_CODE) &&
+                (data[4] == MS_1_0_EXTEND_COMPAT_ID_FEATURE_INDEX)) {
 
-    } else if (data[1] == USBASP_FUNC_WRITEFLASH) {
-        
-        if (!prog_address_newmode)
-            prog_address = (data[3] << 8) | data[2];
-
-        prog_pagesize = data[4];
-        prog_blockflags = data[5] & 0x0F;
-        prog_pagesize += (((unsigned int) data[5] & 0xF0) << 4);
-        if (prog_blockflags & PROG_BLOCKFLAG_FIRST) {
-            prog_pagecounter = prog_pagesize;
-        }
-        prog_nbytes = (data[7] << 8) | data[6];
-        prog_state = PROG_STATE_WRITEFLASH;
-        len = 0xff; /* multiple out */
-
-    } else if (data[1] == USBASP_FUNC_WRITEEEPROM) {
-
-        if (!prog_address_newmode)
-            prog_address = (data[3] << 8) | data[2];
-
-        prog_pagesize = 0;
-        prog_blockflags = 0;
-        prog_nbytes = (data[7] << 8) | data[6];
-        prog_state = PROG_STATE_WRITEEEPROM;
-        len = 0xff; /* multiple out */
-
-    } else if (data[1] == USBASP_FUNC_SETLONGADDRESS) {
-
-        /* set new mode of address delivering (ignore address delivered in commands) */
-        prog_address_newmode = 1;
-        /* set new address */
-        prog_address = *((unsigned long*) &data[2]);
-
-    } else if (data[1] == USBASP_FUNC_SETISPSCK) {
-
-        /* set sck option */
-        prog_sck = data[2];
-        replyBuffer[0] = 0;
-        len = 1;
-
-    } else if (data[1] == USBASP_FUNC_TPI_CONNECT) {
-        tpi_dly_cnt = data[2] | (data[3] << 8);
-
-        /* RST high */
-        ISP_OUT |= (1 << ISP_RST);
-        ISP_DDR |= (1 << ISP_RST);
-
-        clockWait(3);
-
-        /* RST low */
-        ISP_OUT &= ~(1 << ISP_RST);
-        ledRedOn();
-
-        clockWait(16);
-        tpi_init();
-
-    } else if (data[1] == USBASP_FUNC_TPI_DISCONNECT) {
-
-        tpi_send_byte(TPI_OP_SSTCS(TPISR));
-        tpi_send_byte(0);
-
-        clockWait(10);
-
-        /* pulse RST */
-        ISP_OUT |= (1 << ISP_RST);
-        clockWait(5);
-        ISP_OUT &= ~(1 << ISP_RST);
-        clockWait(5);
-
-        /* set all ISP pins inputs */
-        ISP_DDR &= ~((1 << ISP_RST) | (1 << ISP_SCK) | (1 << ISP_MOSI));
-        /* switch pullups off */
-        ISP_OUT &= ~((1 << ISP_RST) | (1 << ISP_SCK) | (1 << ISP_MOSI));
-
-        ledRedOff();
-    
-    } else if (data[1] == USBASP_FUNC_TPI_RAWREAD) {
-        replyBuffer[0] = tpi_recv_byte();
-        len = 1;
-
-    } else if (data[1] == USBASP_FUNC_TPI_RAWWRITE) {
-        tpi_send_byte(data[2]);
-
-    } else if (data[1] == USBASP_FUNC_TPI_READBLOCK) {
-        prog_address = (data[3] << 8) | data[2];
-        prog_nbytes = (data[7] << 8) | data[6];
-        prog_state = PROG_STATE_TPI_READ;
-        len = 0xff; /* multiple in */
-
-    } else if (data[1] == USBASP_FUNC_TPI_WRITEBLOCK) {
-        prog_address = (data[3] << 8) | data[2];
-        prog_nbytes = (data[7] << 8) | data[6];
-        prog_state = PROG_STATE_TPI_WRITE;
-        len = 0xff; /* multiple out */
-
-    } else if(data[1] == USBASP_FUNC_GETCAPABILITIES) {
-         replyBuffer[0] = USBASP_CAP_0_TPI | USBASP_CAP_6_UART;
-         replyBuffer[1] = 0;
-         replyBuffer[2] = 0;
-         replyBuffer[3] = 0;
-         len = 4;
-
-    // UART from now on:
-    } else if(data[1]==USBASP_FUNC_UART_CONFIG){
-        uint16_t baud=(data[3]<<8)|data[2];
-        uint8_t par  = data[4] & USBASP_UART_PARITY_MASK;
-        uint8_t stop = data[4] & USBASP_UART_STOP_MASK;
-        uint8_t bytes= data[4] & USBASP_UART_BYTES_MASK;
-        uart_config(baud, par, stop, bytes);
-        
-    } else if(data[1]==USBASP_FUNC_UART_DISABLE){
-        uart_disable();
-    
-    /* Handle the OS feature request associated with the MS Vendor Code
-    we replied earlier in the OS String Descriptor request. See usbFunctionDescriptor. */
-    } else if (data[0] == REQUEST_GET_VENDOR_CUSTOM) {
-        if((data[1] == MS_1_0_VENDOR_CODE) &&
-            (data[4] == MS_1_0_EXTEND_COMPAT_ID_FEATURE_INDEX)) {
-
-                /* Send the Extended Compat ID OS feature descriptor, 
-                requesting to load the default winusb driver for us */
-                usbMsgFlags = USB_FLG_MSGPTR_IS_ROM;
-                usbMsgPtr = (usbMsgPtr_t)&MS_1_0_OS_EXTENDED_COMPAT_ID_FEATURE;
-                return sizeof(MS_1_0_OS_EXTENDED_COMPAT_ID_FEATURE);
-        }
+                    /* Send the Extended Compat ID OS feature descriptor, 
+                    requesting to load the default winusb driver for us */
+                    usbMsgFlags = USB_FLG_MSGPTR_IS_ROM;
+                    usbMsgPtr = (usbMsgPtr_t)&MS_1_0_OS_EXTENDED_COMPAT_ID_FEATURE;
+                    return sizeof(MS_1_0_OS_EXTENDED_COMPAT_ID_FEATURE);
+                }
 
     } else if (data[0] == REQUEST_GET_MS_1_0_EXTEND_PROPERTIES) {
         if((data[1] == MS_1_0_VENDOR_CODE) &&
@@ -330,7 +317,20 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
                  break;
              }
          }
-     }
+     } else if((data[0] & USBRQ_TYPE_MASK) == USBRQ_TYPE_CLASS) {
+        switch(data[1]) {
+        case USBRQ_HID_GET_REPORT:
+            // wValue: ReportType (highbyte), ReportID (lowbyte)           
+            usbMsgPtr = uartConf_Capabilities_FeatureReport;
+            return sizeof(uartConf_Capabilities_FeatureReport);
+		case USBRQ_HID_SET_REPORT: 
+            if (((data[6]<<8)|data[5]) != 0) {
+                prog_state = PROG_STATE_SET_REPORT;
+                return 0xff;
+            }
+        }
+    }
+
 
     usbMsgPtr = replyBuffer;
 
@@ -356,15 +356,17 @@ uchar usbFunctionRead(uchar *data, uchar len) {
     }
 
     /* fill packet ISP mode */
-    for (i = 0; i < len; i++) {
-        if (prog_state == PROG_STATE_READFLASH) {
-            data[i] = ispReadFlash(prog_address);
-        } else {
-            data[i] = ispReadEEPROM(prog_address);
+    if((prog_state == PROG_STATE_READFLASH) || (prog_state == PROG_STATE_READEEPROM)) {
+        for (i = 0; i < len; i++) {
+            if (prog_state == PROG_STATE_READFLASH) {
+                data[i] = ispReadFlash(prog_address);
+            } else {
+                data[i] = ispReadEEPROM(prog_address);
+            }
+            prog_address++;
         }
-        prog_address++;
     }
-
+    
     /* last packet? */
     if (len < 8) {
         prog_state = PROG_STATE_IDLE;
@@ -380,7 +382,8 @@ uchar usbFunctionWrite(uchar *data, uchar len) {
 
     /* check if programmer is in correct write state */
     if ((prog_state != PROG_STATE_WRITEFLASH) && (prog_state
-            != PROG_STATE_WRITEEEPROM) && (prog_state != PROG_STATE_TPI_WRITE)) {
+            != PROG_STATE_WRITEEEPROM) && (prog_state != PROG_STATE_TPI_WRITE)
+            && (prog_state != PROG_STATE_SET_REPORT)) {
         return 0xff;
     }
 
@@ -397,6 +400,7 @@ uchar usbFunctionWrite(uchar *data, uchar len) {
         return 0;
     }
 
+    if((prog_state == PROG_STATE_WRITEFLASH) || (prog_state == PROG_STATE_WRITEEEPROM)) {
     for (i = 0; i < len; i++) {
 
         if (prog_state == PROG_STATE_WRITEFLASH) {
@@ -435,6 +439,42 @@ uchar usbFunctionWrite(uchar *data, uchar len) {
         }
 
         prog_address++;
+    }
+    }
+    
+    /* Feature report */
+    if(prog_state == PROG_STATE_SET_REPORT) 
+    {
+
+        /*  The first 2 bytes are the uart prescaler ( low byte first then high byte second ) 
+            UART settings. The 3rd byte is a bitmask for parity, stop bit and data bit. 
+            The 4th byte is reserved for future.
+            
+            The last 4 bytes are the USBasp capabilities which are readonly. */
+            
+        for (i = 0; i < 3; i++) {            
+            uartConf_Capabilities_FeatureReport[i] = *data != 0 ? *data : 0;
+            data++;
+        }
+        
+        /*  Disabling uart communication before applying new values. */            
+        uart_disable();
+        
+        uint16_t baud  = (uartConf_Capabilities_FeatureReport[1]<<8)|uartConf_Capabilities_FeatureReport[0];
+        uint8_t  par   = uartConf_Capabilities_FeatureReport[2] & USBASP_UART_PARITY_MASK;
+        uint8_t  stop  = uartConf_Capabilities_FeatureReport[2] & USBASP_UART_STOP_MASK;
+        uint8_t  bytes = uartConf_Capabilities_FeatureReport[2] & USBASP_UART_BYTES_MASK;
+        
+            
+        /*  To enable the uart the baud needs to be non zero. Meaning that to disable the 
+            uart communication just send a set feature report with the first 2 bytes with zero. */
+        if (baud) {
+            uart_config(baud, par, stop, bytes);
+        }
+        
+        prog_state = PROG_STATE_IDLE;
+        
+        retVal = 1;
     }
 
     return retVal;
