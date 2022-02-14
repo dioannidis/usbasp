@@ -8,7 +8,7 @@
  * Tabsize: 4
  * License: GNU GPL v2 (see Readme.txt)
  */
- 
+
 #include "uart.h"
 #include "cbuf.h"
 
@@ -19,28 +19,39 @@
 void __vector_usart_rxc_wrapped() __attribute__ ((signal));
 void __vector_usart_rxc_wrapped(){
     if (!CBUF_IsFull(rx_Q)){
-      CBUF_Push(rx_Q, EEDR);
+      *CBUF_GetPushEntryPtr(rx_Q) = EEDR;
+      CBUF_AdvancePushIdx(rx_Q);
     }
 }
 
 /*
     As we don't use EEPROM we can use EEDR to store the
     UDR value. No need to disable RXCIE interrupt. 
-    Total 4 cycles.
 */
+
+#if (defined __AVR_ATmega8__) || (defined __AVR_ATmega8A__)
 ISR(USART_RXC_vect, ISR_NAKED){
-    __asm__ volatile(   "in  __tmp_reg__, %0 \n"                        // 1 cycle
-                        "out %1, __tmp_reg__ \n"                        // 1 cycle
-                        "rjmp __vector_usart_rxc_wrapped \n"            // 2 cycles
-                        ::"i"(_SFR_IO_ADDR(UDR)),"i"(_SFR_IO_ADDR(EEDR))
-                    );
+  __asm__ volatile(
+    "   in      __tmp_reg__, %0  \n"
+    "   out     %1, __tmp_reg__  \n"
+    "   rjmp __vector_usart_rxc_wrapped \n"           
+    ::  "i"(_SFR_IO_ADDR(USBASPUART_UDR)),"i"(_SFR_IO_ADDR(EEDR))
+#elif (defined __AVR_ATmega88__) || (defined __AVR_ATmega88PA__)
+ISR(USART_RX_vect, ISR_NAKED){
+  __asm__ volatile(
+    "   lds     __tmp_reg__, %0  \n"
+    "   sts     %1, __tmp_reg__  \n"
+    "   rjmp __vector_usart_rxc_wrapped \n"           
+    ::  "m"(USBASPUART_UDR),"m"(EEDR)
+#endif    
+  );
 }
 
 void __vector_usart_udre_wrapped() __attribute__ ((signal));
 void __vector_usart_udre_wrapped(){
     if(!CBUF_IsEmpty(tx_Q)){
-        UDR=CBUF_Pop(tx_Q);
-        UCSRB|=(1<<UDRIE); // Enable this interrupt back.
+        USBASPUART_UDR=*CBUF_GetPopEntryPtr(tx_Q);
+        CBUF_AdvancePopIdx(tx_Q);        
     }
 }
 
@@ -48,17 +59,16 @@ void __vector_usart_udre_wrapped(){
 // Therefore, we clear the interrupt manually and then jump
 // into the real handler. USB interrupt delay is about 3 clocks.
 ISR(USART_UDRE_vect, ISR_NAKED){
-    // Disable this interrupt by clearing its Interrupt Enable flag.
-    __asm__ volatile(   "cbi %0, %1"::
-                        "I"(_SFR_IO_ADDR(UCSRB)),"I"(UDRIE));
-    // Now we can enable interrupts without infinite recursion.
-    __asm__ volatile("sei"::);
-    // Jump into the actual handler.
-    __asm__ volatile("rjmp __vector_usart_udre_wrapped"::);
+  __asm__ volatile(
+    "   rjmp __vector_usart_udre_wrapped    \n"
+    ::
+  ); 
 }
 
 void uart_disable(){
-    UCSRB=0;
+    
+    USBASPUART_UCSRB=0;
+    
 }
 
 void uart_config(uint16_t baud, uint8_t par, uint8_t stop, uint8_t bytes){
@@ -69,32 +79,32 @@ void uart_config(uint16_t baud, uint8_t par, uint8_t stop, uint8_t bytes){
     CBUF_Init(rx_Q);
 
     // Turn 2x mode.
-    UCSRA=(1<<U2X);
+    USBASPUART_UCSRA=(1<<USBASPUART_U2X);
 
     uint8_t byte=0;
     switch(par){
-        case USBASP_UART_PARITY_EVEN: byte|=(1<<UPM1); break;
-        case USBASP_UART_PARITY_ODD:  byte|=(1<<UPM1)|(1<<UPM0); break;
+        case USBASP_UART_PARITY_EVEN: byte|=(1<<USBASPUART_UPM1); break;
+        case USBASP_UART_PARITY_ODD:  byte|=(1<<USBASPUART_UPM1)|(1<<USBASPUART_UPM0); break;
         default: break;
     }
 
     if(stop == USBASP_UART_STOP_2BIT){
-        byte|=(1<<USBS);
+        byte|=(1<<USBASPUART_USBS);
     }
 
     switch(bytes){
-        case USBASP_UART_BYTES_6B: byte|=(1<<UCSZ0); break;
-        case USBASP_UART_BYTES_7B: byte|=(1<<UCSZ1); break;
-        case USBASP_UART_BYTES_8B: byte|=(1<<UCSZ1)|(1<<UCSZ0); break;
-        case USBASP_UART_BYTES_9B: byte|=(1<<UCSZ2)|(1<<UCSZ1)|(1<<UCSZ0); break;
+        case USBASP_UART_BYTES_6B: byte|=(1<<USBASPUART_UCSZ0); break;
+        case USBASP_UART_BYTES_7B: byte|=(1<<USBASPUART_UCSZ1); break;
+        case USBASP_UART_BYTES_8B: byte|=(1<<USBASPUART_UCSZ1)|(1<<USBASPUART_UCSZ0); break;
+        case USBASP_UART_BYTES_9B: byte|=(1<<USBASPUART_UCSZ2)|(1<<USBASPUART_UCSZ1)|(1<<USBASPUART_UCSZ0); break;
         default: break;
     }
-
-    UCSRC=byte;
     
-    UBRRL=baud&0xFF;
-    UBRRH=baud>>8;
+    USBASPUART_UCSRC=byte;
+    
+    USBASPUART_UBRRL=(unsigned char)baud;
+    USBASPUART_UBRRH=(unsigned char)(baud>>8);
 
     // Turn on RX/TX and RX interrupt.
-    UCSRB=(1<<RXCIE)|(1<<RXEN)|(1<<TXEN);
+    USBASPUART_UCSRB=(1<<USBASPUART_RXCIE)|(1<<USBASPUART_RXEN)|(1<<USBASPUART_TXEN);
 }
