@@ -549,10 +549,10 @@ void usbFunctionWriteOut(uchar *data, uchar len){
             *CBUF_GetPushEntryPtr(tx_Q) = *data++;
             CBUF_AdvancePushIdx(tx_Q);
         }while((--len) || (CBUF_IsFull(tx_Q)));
-    }
     
-    if (!(USBASPUART_UCSRB & (1<<USBASPUART_UDRIE))){
-        USBASPUART_UCSRB|=(1<<USBASPUART_UDRIE);
+        if (!(USBASPUART_UCSRB & (1<<USBASPUART_UDRIE))){
+            USBASPUART_UCSRB|=(1<<USBASPUART_UDRIE);
+        }
     }
 }
 
