@@ -433,45 +433,45 @@ uchar usbFunctionWrite(uchar *data, uchar len) {
     }
 
     if((prog_state == PROG_STATE_WRITEFLASH) || (prog_state == PROG_STATE_WRITEEEPROM)) {
-    for (i = 0; i < len; i++) {
+        for (i = 0; i < len; i++) {
 
-        if (prog_state == PROG_STATE_WRITEFLASH) {
-            /* Flash */
+            if (prog_state == PROG_STATE_WRITEFLASH) {
+                /* Flash */
 
-            if (prog_pagesize == 0) {
-                /* not paged */
-                ispWriteFlash(prog_address, data[i], 1);
-            } else {
-                /* paged */
-                ispWriteFlash(prog_address, data[i], 0);
-                prog_pagecounter--;
-                if (prog_pagecounter == 0) {
-                    ispFlushPage(prog_address, data[i]);
-                    prog_pagecounter = prog_pagesize;
+                if (prog_pagesize == 0) {
+                    /* not paged */
+                    ispWriteFlash(prog_address, data[i], 1);
+                } else {
+                    /* paged */
+                    ispWriteFlash(prog_address, data[i], 0);
+                    prog_pagecounter--;
+                    if (prog_pagecounter == 0) {
+                        ispFlushPage(prog_address, data[i]);
+                        prog_pagecounter = prog_pagesize;
+                    }
                 }
+
+            } else {
+                /* EEPROM */
+                ispWriteEEPROM(prog_address, data[i]);
             }
 
-        } else {
-            /* EEPROM */
-            ispWriteEEPROM(prog_address, data[i]);
-        }
+            prog_nbytes--;
 
-        prog_nbytes--;
+            if (prog_nbytes == 0) {
+                prog_state = PROG_STATE_IDLE;
+                if ((prog_blockflags & PROG_BLOCKFLAG_LAST) && (prog_pagecounter
+                        != prog_pagesize)) {
 
-        if (prog_nbytes == 0) {
-            prog_state = PROG_STATE_IDLE;
-            if ((prog_blockflags & PROG_BLOCKFLAG_LAST) && (prog_pagecounter
-                    != prog_pagesize)) {
+                    /* last block and page flush pending, so flush it now */
+                    ispFlushPage(prog_address, data[i]);
+                }
 
-                /* last block and page flush pending, so flush it now */
-                ispFlushPage(prog_address, data[i]);
+                retVal = 1; // Need to return 1 when no more data is to be received
             }
 
-            retVal = 1; // Need to return 1 when no more data is to be received
+            prog_address++;
         }
-
-        prog_address++;
-    }
     }
     
     /* Feature report */
@@ -529,7 +529,7 @@ uchar usbFunctionWrite(uchar *data, uchar len) {
  */
 
 
-/* Host to device. */
+/* Host to device. Endpoint 1 Output */
 void usbFunctionWriteOut(uchar *data, uchar len){
 
 /*
@@ -544,16 +544,17 @@ void usbFunctionWriteOut(uchar *data, uchar len){
     /* Actual serial bytes in output report */
     len = data[7];
     
-    while(len--){
-        if (!CBUF_IsFull(tx_Q)){
-            CBUF_Push(tx_Q, *data++);
-        } else { break; }
-    }
+    do{
+        *CBUF_GetPushEntryPtr(tx_Q) = *data++;
+        CBUF_AdvancePushIdx(tx_Q);
+    }while((--len) || (CBUF_IsFull(tx_Q)));
 
-    UCSRB|=(1<<UDRIE);
+    if (!(USBASPUART_UCSRB & (1<<USBASPUART_UDRIE))){
+        USBASPUART_UCSRB|=(1<<USBASPUART_UDRIE);
+    }
 }
 
-/* Device to host. */
+/* Device to host. Endpoint 1 Input */
 void HID_EP_1_IN(){
 /*
     AFAIU, interrupt requests must be exactly 8 bytes long for USB 1.1 .
@@ -573,6 +574,7 @@ void HID_EP_1_IN(){
 
     /* Actual serial bytes in input report */
     interruptBuffer[7] = EEAR;
+    
     usbSetInterrupt(interruptBuffer, sizeof(interruptBuffer));
 }
 
