@@ -15,17 +15,17 @@
 #define TIMERVALUE      TCNT0
 //#define CLOCK_T_320us	60
 
-#if F_CPU == 12000000
-# define CLOCK_T_320us	60
-#elif F_CPU == 18000000
-# define CLOCK_T_320us	90
-#elif F_CPU == 20000000
-# define CLOCK_T_320us	100
+#if F_CPU == 12000000L
+# define CLOCK_T_320us      60
+#elif F_CPU == 16000000L            /* ATmega8 max speed */
+# define CLOCK_T_320us      80
+#elif F_CPU == 18000000L
+# define CLOCK_T_320us      90
+#elif F_CPU == 20000000L
+# define CLOCK_T_320us      100
 #endif
 
-
-//#ifdef __AVR_ATmega8__
-#if (defined __AVR_ATmega8__) || (defined __AVR_ATmega8A__) || (defined __AVR_ATmega88__)
+#if (defined __AVR_ATmega8__) || (defined __AVR_ATmega8A__)
 #define TCCR0B  TCCR0
 #endif
 
