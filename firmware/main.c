@@ -544,11 +544,13 @@ void usbFunctionWriteOut(uchar *data, uchar len){
     /* Actual serial bytes in output report */
     len = data[7];
     
-    do{
-        *CBUF_GetPushEntryPtr(tx_Q) = *data++;
-        CBUF_AdvancePushIdx(tx_Q);
-    }while((--len) || (CBUF_IsFull(tx_Q)));
-
+    if(!CBUF_IsFull(tx_Q)) {
+        do{
+            *CBUF_GetPushEntryPtr(tx_Q) = *data++;
+            CBUF_AdvancePushIdx(tx_Q);
+        }while((--len) || (CBUF_IsFull(tx_Q)));
+    }
+    
     if (!(USBASPUART_UCSRB & (1<<USBASPUART_UDRIE))){
         USBASPUART_UCSRB|=(1<<USBASPUART_UDRIE);
     }
