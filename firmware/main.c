@@ -619,6 +619,7 @@ int main(void) {
         if(usbAllRequestsAreDisabled() && CBUF_IsEmpty(tx_Q)) {
             usbEnableAllRequests();
         }
+    }
 
     return 0;
 }
