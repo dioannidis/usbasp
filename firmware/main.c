@@ -539,7 +539,7 @@ void usbFunctionWriteOut(uchar *data, uchar len){
        until the transmit buffer is empty. We rely on 
        usb trasmit retries to not loose any data. */
 
-    if(CBUF_IsFull(tx_Q)) {
+    if(CBUF_Len(tx_Q) > (tx_Q_SIZE - 8)) {
             usbDisableAllRequests();
     } else {
 
@@ -551,7 +551,7 @@ void usbFunctionWriteOut(uchar *data, uchar len){
             CBUF_AdvancePushIdx(tx_Q);
         }while((--len) || (CBUF_IsFull(tx_Q)));
 
-        if(CBUF_IsFull(tx_Q)) {
+        if(CBUF_Len(tx_Q) > (tx_Q_SIZE - 8)) {
             usbDisableAllRequests();
         }
 
@@ -609,16 +609,18 @@ int main(void) {
         
     sei();
     for (;;) {
-        usbPoll();
-        if (usbInterruptIsReady()) {
-            HID_EP_1_IN();
-        }
 
         /*  Reenable usb requests now that the transmit buffer
             is empty. */
         if(usbAllRequestsAreDisabled() && CBUF_IsEmpty(tx_Q)) {
             usbEnableAllRequests();
         }
+
+        usbPoll();
+        if (usbInterruptIsReady()) {
+            HID_EP_1_IN();
+        }
+
     }
 
     return 0;
