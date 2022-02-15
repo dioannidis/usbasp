@@ -329,12 +329,6 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
                          }
                      }
                 break;
-                case USBRQ_GET_INTERFACE:
-                    replyBuffer[0] = 0;
-                    len = 1;
-                break;
-                case USBRQ_SET_INTERFACE:
-                    break;
                 default:
                 break;               
             }
@@ -541,15 +535,28 @@ void usbFunctionWriteOut(uchar *data, uchar len){
 
 */
 
-    /* Actual serial bytes in output report */
-    len = data[7];
-    
-    if(!CBUF_IsFull(tx_Q)) {
+    /* If the transmit buffer is full, disable usb requests
+       until the transmit buffer is empty. We rely on 
+       usb trasmit retries to not loose any data. */
+
+    if(CBUF_IsFull(tx_Q)) {
+            usbDisableAllRequests();
+    } else {
+
+        /* Actual serial bytes in output report */
+        len = data[7];
+
         do{
             *CBUF_GetPushEntryPtr(tx_Q) = *data++;
             CBUF_AdvancePushIdx(tx_Q);
         }while((--len) || (CBUF_IsFull(tx_Q)));
-    
+
+        if(CBUF_IsFull(tx_Q)) {
+            usbDisableAllRequests();
+        }
+
+        /* If we are not transmiting then trigger 
+           to start transmit. */
         if (!(USBASPUART_UCSRB & (1<<USBASPUART_UDRIE))){
             USBASPUART_UCSRB|=(1<<USBASPUART_UDRIE);
         }
@@ -587,13 +594,13 @@ int main(void) {
 
     /* init timer */
     clockInit();
-       
+
     /* output SE0 for USB reset */
     DDRB = ~0;
     clockWait(10 / 0.320);              /* 10ms */
     /* all USB and ISP pins inputs to end USB reset */
     DDRB = 0;
-                
+
     /* USBasp active */
     ledGreenOn();
 
@@ -602,10 +609,16 @@ int main(void) {
         
     sei();
     for (;;) {
-        usbPoll();       
+        usbPoll();
         if (usbInterruptIsReady()) {
             HID_EP_1_IN();
-        }        
-    }
+        }
+
+        /*  Reenable usb requests now that the transmit buffer
+            is empty. */
+        if(usbAllRequestsAreDisabled() && CBUF_IsEmpty(tx_Q)) {
+            usbEnableAllRequests();
+        }
+
     return 0;
 }
