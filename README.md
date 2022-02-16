@@ -1,13 +1,12 @@
 # usbasp improved
+### _with ( slow ) HID UART support_
 
-USBasp firmware based on <a href="https://github.com/bperrybap/usbasp">a fork by Bill Perry</a> and the latest <a href="https://github.com/obdev/v-usb">v-usb</a>.
+This USBasp firmware is based on [a fork by Ralph Doncaster](https://github.com/nerdralph/usbasp). Original fork readme can be found at README_fork.md.
 
-Firmware version 1.06 (2020-09-14) features a default SCK clock of 1.5Mhz and automatic SCK slowing if target does not respond.  PORTD is left as input, so this firmware also works <a href="https://www.sciencetronics.com/greenphotons/?p=938">with USBISP modules</a>.
+### Features
 
-Thanks to <a href="https://github.com/nerdralph/usbasp/pull/5">patches from Dimitrios</a>, the USBasp firmware 1.08 is WCID compliant, meaning it should work on Windows without any driver or .inf install.
+- From version 1.07 a default SCK clock of 1.5Mhz and automatic SCK slowing if target does not respond.  PORTD is left as input, so this firmware also works [with USBISP modules](https://www.sciencetronics.com/greenphotons/?p=938).
+- From version 1.08 the firmware is WCID compliant, meaning it should work on Windows without any driver or .inf install.
+- From version 1.09 a slow ( 4800 Baud ) uart HID implementaion added for debugging purposes.
 
 A pre-built hex file for the mega8 (main.hex) is in the firmware directory, along with m88.hex for the mega88.
-
-## development plans
-Recognize when the target device is in debugWIRE mode, and send the dW command to enter ISP mode.
-
