@@ -37,9 +37,6 @@
 
 /* USBASP capabilities */
 #define USBASP_CAP_0_TPI                0x01
-
-/* USBASP capabilities */
-#define USBASP_CAP_0_TPI                0x01
 #define USBASP_CAP_6_UART               0x40
 #define USBASP_CAP_20MHZ_CLOCK          0x01
 
