@@ -529,38 +529,33 @@ void usbFunctionWriteOut(uchar *data, uchar len){
 /*
     AFAIU, interrupt out must be exactly 8 bytes long for USB 1.1 .
     As we must know how many bytes of the report are actual bytes 
-    sended, the length is in the last byte. Effectively loosing 1 byte.
+    sended, the length is in the last byte. Effectively losing 1 byte.
 
     TODO: Fix this !
 
 */
 
-    /* If the transmit buffer is full, disable usb requests
-       until the transmit buffer is empty. We rely on 
-       usb trasmit retries to not loose any data. */
-
-    if(CBUF_Len(tx_Q) > (tx_Q_SIZE - 8)) {
-            usbDisableAllRequests();
-    } else {
-
         /* Actual serial bytes in output report */
-        len = data[7];
+        data[7] < 8 ? len = data[7] : 0;
+        
+        /*  If UART enabled ( RXCIE enabled ) 
+            is there serial data in the report ? */
+        if(len && (USBASPUART_UCSRB & (1<<USBASPUART_RXCIE))) {
 
-        do{
-            *CBUF_GetPushEntryPtr(tx_Q) = *data++;
-            CBUF_AdvancePushIdx(tx_Q);
-        }while((--len) || (CBUF_IsFull(tx_Q)));
-
-        if(CBUF_Len(tx_Q) > (tx_Q_SIZE - 8)) {
-            usbDisableAllRequests();
+            /* If the transmit buffer is near full, disable usb requests
+               until the transmit buffer is empty. We rely on 
+               usb trasmit retries to not lose any data. */
+            if((CBUF_Len(tx_Q)) + len > (tx_Q_SIZE - 8)) {
+                usbDisableAllRequests();                
+            }
+                                   
+            do{
+                *CBUF_GetPushEntryPtr(tx_Q) = *data++;
+                CBUF_AdvancePushIdx(tx_Q);                                              
+            }while(--len);
+                        
         }
-
-        /* If we are not transmiting then trigger 
-           to start transmit. */
-        if (!(USBASPUART_UCSRB & (1<<USBASPUART_UDRIE))){
-            USBASPUART_UCSRB|=(1<<USBASPUART_UDRIE);
-        }
-    }
+        
 }
 
 /* Device to host. Endpoint 1 Input */
@@ -568,7 +563,7 @@ void HID_EP_1_IN(){
 /*
     AFAIU, interrupt requests must be exactly 8 bytes long for USB 1.1 .
     As we must inform the receiver how many serial bytes we return, we 
-    store the actual length in the last byte. Effectively loosing 1 byte.
+    store the actual length in the last byte. Effectively losing 1 byte.
 
     TODO: Fix this !
 
@@ -606,16 +601,26 @@ int main(void) {
 
     /* main event loop */
     usbInit();
-        
+     
     sei();
     for (;;) {
-
-        /*  Reenable usb requests now that the transmit buffer
-            is empty. */
-        if(usbAllRequestsAreDisabled() && CBUF_IsEmpty(tx_Q)) {
-            usbEnableAllRequests();
+        
+        
+        /*  Enable transmit interrupt if tx buffer has data
+            and the transmit interrupt is disabled. */
+        if(!(USBASPUART_UCSRB & (1<<USBASPUART_UDRIE)) 
+            && !CBUF_IsEmpty(tx_Q)) {
+            
+            USBASPUART_UCSRB |= (1<<USBASPUART_UDRIE);
+            
+        /*  Reenable USB requests if they are 
+            disabled and tx buffer is empty. */
+        } else if(CBUF_IsEmpty(tx_Q)) {          
+            if(usbAllRequestsAreDisabled()){
+                usbEnableAllRequests();
+            }
         }
-
+                
         usbPoll();
         if (usbInterruptIsReady()) {
             HID_EP_1_IN();

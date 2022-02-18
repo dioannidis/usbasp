@@ -54,6 +54,8 @@ void __vector_usart_udre_wrapped(){
     if(!CBUF_IsEmpty(tx_Q)){
         USBASPUART_UDR=*CBUF_GetPopEntryPtr(tx_Q);
         CBUF_AdvancePopIdx(tx_Q);        
+    } else {
+        USBASPUART_UCSRB &= ~(1<<USBASPUART_UDRIE);
     }
     
 }
