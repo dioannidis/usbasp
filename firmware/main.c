@@ -90,7 +90,7 @@ static uchar prog_pagecounter;
 
     The MS VendorCode field is used to retrieve the associated feature descriptors. This code is 
     used as Request field in TS_URB_CONTROL_VENDOR_OR_CLASS_REQUEST section 2.2.9.12.
-    
+
     In usbFunctionSetup we handle the feature request associated to MS Vendor Code we replied earlier 
     and send an Extended Compat ID with the information that we want Windows to load the winusb default driver.
 
@@ -110,13 +110,13 @@ static uchar prog_pagecounter;
     whether the device supports Microsoft OS Descriptors. If the device does not provide a valid response 
     the first time that the operating system queries it for a Microsoft OS String Descriptor, 
     the operating system will make no further requests for that descriptor."
-    
+
     If your firmware doesn't work please delete the registry key as stated above to retrigger a query from Windows.
-    
+
     i.e. if your firmware has a device version of 0x07, 0x01 then there will be a registry key with the name :
-    
+
     Computer\HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\usbflags\16C005DC0107
-    
+
 */
 
 usbMsgLen_t usbFunctionDescriptor(struct usbRequest *rq) {
@@ -141,13 +141,13 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
     DBG1(0xF5, data, 8);
 
     usbMsgLen_t len = 0;
-     
+
     /* Device Requests */
-     
+
     if ((data[0] & USBRQ_TYPE_MASK) == USBRQ_TYPE_VENDOR) {
         
         if((data[0] & USBRQ_RCPT_MASK) == USBRQ_RCPT_DEVICE) {
-        
+
             if (data[1] == USBASP_FUNC_CONNECT) {
                 uart_disable(); // make it not interefere.
 
@@ -268,7 +268,7 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
                 ISP_OUT &= ~((1 << ISP_RST) | (1 << ISP_SCK) | (1 << ISP_MOSI));
 
                 ledRedOff();
-            
+
             } else if (data[1] == USBASP_FUNC_TPI_RAWREAD) {
                 replyBuffer[0] = tpi_recv_byte();
                 len = 1;
@@ -330,34 +330,34 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
                      }
                 break;
                 default:
-                break;               
+                break;
             }
             
         }
 
     /* Interface Requests */
         
-    } else if((data[0] & USBRQ_TYPE_MASK) == USBRQ_TYPE_CLASS) {
-        
-        if((data[0] & USBRQ_RCPT_MASK) == USBRQ_RCPT_INTERFACE) {
+    } else if((data[0] & USBRQ_TYPE_MASK) == USBRQ_TYPE_CLASS){
+
+        if((data[0] & USBRQ_RCPT_MASK) == USBRQ_RCPT_INTERFACE){
 
             switch(data[1]) {
                 case USBRQ_HID_GET_REPORT:
-                    // wValue: ReportType (highbyte), ReportID (lowbyte)           
+                    // wValue: ReportType (highbyte), ReportID (lowbyte)
                     usbMsgPtr = uartConf_Capabilities_FeatureReport;
                     return sizeof(uartConf_Capabilities_FeatureReport);
-                case USBRQ_HID_SET_REPORT: 
-                    if (((data[6]<<8)|data[5]) != 0) {
+                case USBRQ_HID_SET_REPORT:
+                    if (((data[6]<<8)|data[5]) != 0){
                         prog_state = PROG_STATE_SET_REPORT;
                         len = 0xff; /* multiple in */
                     }
                 default:
-                break;               
+                break;
             }
             
         }
     }
-    
+
     usbMsgPtr = replyBuffer;
 
     return len;
@@ -392,7 +392,7 @@ uchar usbFunctionRead(uchar *data, uchar len) {
             prog_address++;
         }
     }
-    
+
     /* last packet? */
     if (len < 8) {
         prog_state = PROG_STATE_IDLE;
@@ -497,7 +497,7 @@ uchar usbFunctionWrite(uchar *data, uchar len) {
         if (baud) {
             uart_config(baud, par, stop, bytes);
         }
-        
+
         prog_state = PROG_STATE_IDLE;
         
         retVal = 1;
@@ -601,18 +601,18 @@ int main(void) {
 
     /* main event loop */
     usbInit();
-     
+
     sei();
     for (;;) {
-        
-        
+
+
         /*  Enable transmit interrupt if tx buffer has data
             and the transmit interrupt is disabled. */
         if(!(USBASPUART_UCSRB & (1<<USBASPUART_UDRIE)) 
             && !CBUF_IsEmpty(tx_Q)) {
-            
+
             USBASPUART_UCSRB |= (1<<USBASPUART_UDRIE);
-            
+
         /*  Reenable USB requests if they are 
             disabled and tx buffer is empty. */
         } else if(CBUF_IsEmpty(tx_Q)) {          
@@ -620,7 +620,7 @@ int main(void) {
                 usbEnableAllRequests();
             }
         }
-                
+
         usbPoll();
         if (usbInterruptIsReady()) {
             HID_EP_1_IN();
