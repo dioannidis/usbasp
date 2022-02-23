@@ -570,23 +570,37 @@ void usbFunctionWriteOut(uchar *data, uchar len){
 /* Device to host. Endpoint 1 Input */
 void HID_EP_1_IN(){
 /*
-    AFAIU, interrupt requests must be exactly 8 bytes long for USB 1.1 .
-    As we must inform the receiver how many serial bytes we return, we 
-    store the actual length in the last byte. Effectively losing 1 byte.
-
-    TODO: Fix this !
-
+    AFAIU, interrupt requests must be exactly 8 bytes long for USB 1.1 .   
 */
     /* As we don't use EEPROM use the EEAR register as variable */
     EEAR = 0;
     
+    /*  We fill the first 7 bytes of the report from
+        the receive buffer if they are exist. */
     while((!(CBUF_IsEmpty(rx_Q))) && (EEAR != 7)){
         interruptBuffer[EEAR++] = CBUF_Get(rx_Q, 0);
         CBUF_AdvancePopIdx(rx_Q);
     }
 
-    /* Actual serial bytes in input report */
-    interruptBuffer[7] = EEAR;
+    /*  The 8th byte holds the serial bytes count if the 
+        receive buffer is empty or the serial count is at 
+        least 7. If the receive buffer is not empty then if 
+        the next byte in the receive buffer is greater than 7 we 
+        added it to the report else wait for the next 
+        interrupt request. This way the receiver can distinguish 
+        if the 8th byte is serial data or serial data count. 
+        
+        Now we losing 1 byte, only in the case, when we filled
+        all the 7 bytes of the report and the next byte
+        in the receive buffer is 7 or smaller. Effectively increased
+        the capability to use 9600 baud reliably. */
+        
+    if ((!(CBUF_IsEmpty(rx_Q))) && (EEAR == 7) && CBUF_Get(rx_Q, 0) > 7) {
+        interruptBuffer[EEAR] = CBUF_Get(rx_Q, 0);
+        CBUF_AdvancePopIdx(rx_Q);        
+    } else {       
+        interruptBuffer[7] = EEAR;
+    }
     
     usbSetInterrupt(interruptBuffer, sizeof(interruptBuffer));
 }
