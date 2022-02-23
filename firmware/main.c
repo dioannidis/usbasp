@@ -574,6 +574,7 @@ void HID_EP_1_IN(){
 */
     /* As we don't use EEPROM use the EEAR register as variable */
     EEAR = 0;
+    interruptBuffer[7] = EEAR;
     
     /*  We fill the first 7 bytes of the report from
         the receive buffer if they are exist. */
@@ -595,7 +596,7 @@ void HID_EP_1_IN(){
         in the receive buffer is 7 or smaller. Effectively increased
         the capability to use 9600 baud reliably. */
         
-    if ((!(CBUF_IsEmpty(rx_Q))) && (EEAR == 7) && CBUF_Get(rx_Q, 0) > 7) {
+    if ((!(CBUF_IsEmpty(rx_Q))) && (EEAR == 7) && (CBUF_Get(rx_Q, 0) > 7)) {
         interruptBuffer[EEAR] = CBUF_Get(rx_Q, 0);
         CBUF_AdvancePopIdx(rx_Q);        
     } else {       
