@@ -21,10 +21,13 @@ Pre-built avrdude 6.3 and 6.4, windows executables, if needed, is in the bin\avr
 
 UART HID implementation uses 8 byte size input and output reports. 
 
-The last byte ( 8th ) has a special meaning. If its value is greater than 7 then it is serial data. If the value is 7 or smaller then its the serial data count.
+The last byte ( 8th ) has special meaning different for input reports and output reports.
+
+_Input Reports ( USBasp -> USB PC )_
+
+It  holds the actual serial bytes count. The remaining bytes are ignored. If its value is greater than 7 then it is serial data. If the value is 7 or smaller then its the serial data count.
 
 i.e.
-Input or Output Report
 
 ```sh
 0x55,0x34,0x00,0x00,0x00,0x00,0x00,0x02 -> Actual serial bytes 2 : 0x55,0x34
@@ -33,6 +36,19 @@ Input or Output Report
 
 0x00,0xC3,0x34,0x55,0x32,0xF3,0x00,0xAB -> Actual serial bytes 8 ( 8th byte > 7 ) : 0x00,0xC3,0x34,0x55,0x32,0xF3,0x00,0xAB
 ```
+
+_Output Reports ( USB PC -> USBasp)_
+
+The last byte ( 8th ) holds the actual serial bytes count. The remaining bytes are ignored.
+
+i.e.
+
+```sh
+0x55,0x34,0x00,0x00,0x00,0x00,0x00,0x02 -> Actual serial bytes 2 : 0x55,0x34
+
+0x00,0x34,0x00,0x66,0x32,0x36,0x00,0x04 -> Actual serial bytes 4 : 0x00,0x34,0x00,0x66
+```
+
 ##### _UART Configuration_
 The USBasp's UART configuration uses a 1 byte size feature report, with the following format.
 
