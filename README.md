@@ -7,7 +7,7 @@ This USBasp firmware is based on [a fork by Ralph Doncaster]. Original fork read
 - From version 1.07 a default SCK clock of 1.5Mhz and automatic SCK slowing if target does not respond.  PORTD is left as input, so this firmware also works [with USBISP modules]. ( nerdralph )
 - From version 1.08 the firmware is [WCID] compliant, meaning it should work on Windows without any driver or .inf install.
 ##### _( beta )_
-- From version 1.09 a slow ( 4800 - 7200 Baud ) UART HID implementation will be added for debugging purposes. USBasp will appear as a composite device with a WINUSB interface and a HID interface.
+- From version 1.09 a slow ( 9600 Baud ) UART HID implementation will be added for debugging purposes. USBasp will appear as a composite device with a WINUSB interface and a HID interface.
 
 > Note: A pre-built hex file for the mega8 (main.hex) is in the firmware directory, along with m88.hex for the mega88.
 
