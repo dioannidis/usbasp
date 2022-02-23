@@ -341,20 +341,29 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
 
         if((data[0] & USBRQ_RCPT_MASK) == USBRQ_RCPT_INTERFACE){
 
-            switch(data[1]) {
-                case USBRQ_HID_GET_REPORT:
-                    // wValue: ReportType (highbyte), ReportID (lowbyte)
-                    usbMsgPtr = uartConf_Capabilities_FeatureReport;
-                    return sizeof(uartConf_Capabilities_FeatureReport);
-                case USBRQ_HID_SET_REPORT:
-                    if (((data[6]<<8)|data[5]) != 0){
-                        prog_state = PROG_STATE_SET_REPORT;
-                        len = 0xff; /* multiple in */
+            switch(data[3]) { // wValue: ReportType (highbyte), ReportID (lowbyte)
+                case 3 : // Feature Report
+                    switch(data[1]) {
+                        case USBRQ_HID_GET_REPORT:
+                            
+                            usbMsgPtr = uartConf_Capabilities_FeatureReport;
+                            return sizeof(uartConf_Capabilities_FeatureReport);
+                            
+                        case USBRQ_HID_SET_REPORT:
+                        
+                            if (((data[6]<<8)|data[5]) != 0){
+                                prog_state = PROG_STATE_SET_REPORT;
+                                len = 0xff; /* multiple in */
+                            }
+                            break;
+                            
+                        default:
+                        break;
                     }
+                    break;
                 default:
                 break;
-            }
-            
+            }            
         }
     }
 
