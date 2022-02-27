@@ -547,10 +547,7 @@ void usbFunctionWriteOut(uchar *data, uchar len){
         interrupt request. This way the receiver can distinguish 
         if the 8th byte is serial data or serial data count. 
         
-        Now we losing 1 byte, only in the case, when we filled
-        all the 7 bytes of the report and the next byte
-        in the receive buffer is 7 or smaller. Effectively increased
-        the capability to use 9600 baud reliably. */
+        Effectively increased the capability to use 9600 baud reliably. */
 
         if (data[7] > 0) {
             if (data[7] < 8) {
