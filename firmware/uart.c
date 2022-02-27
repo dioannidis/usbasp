@@ -73,11 +73,11 @@ ISR(USART_UDRE_vect, ISR_NAKED){
 void uart_disable(){
     
     USBASPUART_UCSRB = 0;
+    USBASPUART_UCSRB &= ~(1<<USBASPUART_UDRIE);
 
     CBUF_Init(tx_Q);
     CBUF_Init(rx_Q);
    
-    USBASPUART_UCSRB &= ~(1<<USBASPUART_UDRIE);
     
     if(usbAllRequestsAreDisabled()){
         usbEnableAllRequests();
