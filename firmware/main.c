@@ -537,15 +537,28 @@ void usbFunctionWriteOut(uchar *data, uchar len){
 
 /*
     AFAIU, interrupt out must be exactly 8 bytes long for USB 1.1 .
-    As we must know how many bytes of the report are actual bytes 
-    sended, the length is in the last byte. Effectively losing 1 byte.
-
-    TODO: Fix this !
-
 */
 
-        /* Actual serial bytes in output report */
-        data[7] < 8 ? len = data[7] : 0;
+    /*  The 8th byte holds the serial bytes count if the 
+        receive buffer is empty or the serial count is at 
+        least 7. If the receive buffer is not empty then if 
+        the next byte in the receive buffer is greater than 7 we 
+        added it to the report else wait for the next 
+        interrupt request. This way the receiver can distinguish 
+        if the 8th byte is serial data or serial data count. 
+        
+        Now we losing 1 byte, only in the case, when we filled
+        all the 7 bytes of the report and the next byte
+        in the receive buffer is 7 or smaller. Effectively increased
+        the capability to use 9600 baud reliably. */
+
+        if (data[7] > 0) {
+            if (data[7] < 8) {
+                len = data[7];
+            }
+        } else {
+            len = 0;
+        }
         
         /*  If UART enabled ( RXCIE enabled ) 
             is there serial data in the report ? */
@@ -555,7 +568,7 @@ void usbFunctionWriteOut(uchar *data, uchar len){
                until the transmit buffer is empty. We rely on 
                usb trasmit retries to not lose any data. */
             if((CBUF_Len(tx_Q)) + len > (tx_Q_SIZE - 8)) {
-                usbDisableAllRequests();                
+                usbDisableAllRequests();
             }
                                    
             do{
