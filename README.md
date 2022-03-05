@@ -56,21 +56,28 @@ The USBaspHIDUART is a simple console utility, used for testing the HID UART imp
 This is the help page ( USBaspHIDUART.exe -h ) :
 
 ```sh
+
+USBaspHIDUART -h
+
 USBasp HIDUART Test App
 
--l List USBasp HID devices
--i Select USBasp index ( default 0 )
--b Set Baud ( default 9600 )
--r Continuous read input
--w Interactive send output
+ -l  List USBasp HID devices
+ -i  Select USBasp index ( default 0 )
+ -b  Set Baud ( default 9600 )
+ -b  Set Crystal Hz ( default 12 MHz or 12000000 Hz )
+ -r  Continuous read input
+ -w  Interactive send output
 
 examples
 
 Read from USBasp at index 0 with 4800 baud
-USBaspHIDUART -b 4800 -r
+ USBaspHIDUART -b 4800 -r
 
 Interactive write to USBasp at index 1 with 9600 baud
-USBaspHIDUART -i 1 -w 
+ USBaspHIDUART -i 1 -w
+
+Read from USBasp at index 1 with 19200 baud from a device with 20 MHz crystal
+ USBaspHIDUART -i 1 -b 19200 -c 20000000 -r
 ```
 
 
