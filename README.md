@@ -16,6 +16,7 @@ Pre-built avrdude 6.3 and 6.4, windows executables, if needed, is in the bin\avr
 
 ### UART HID protocol
 
+> Note: There is a small 128 byte ring buffer for both Tx and Rx. That means you can use higher baud rates ( i.e. 115200 ) if the message length is smaller than 128 bytes and the transmit / receive interval is 160 ms or higher.
 
 ##### _Serial Data_
 
