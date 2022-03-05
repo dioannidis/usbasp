@@ -20,7 +20,7 @@ Pre-built avrdude 6.3 and 6.4, windows executables, if needed, is in the bin\avr
 
 ##### _Serial Data_
 
-UART HID implementation uses 8 byte size input and output reports. 
+UART HID implementation uses 8 byte size input and output interrupt reports. 
 
 The last byte ( 8th ) has special meaning. It  holds the actual serial bytes count. If its value is greater than 7 then it is serial data. If the value is 7 or smaller then its the serial data count and the remaining bytes are ignored.
 
