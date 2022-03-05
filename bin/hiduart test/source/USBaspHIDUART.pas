@@ -277,7 +277,7 @@ type
     writeln(' -l  List USBasp HID devices');
     writeln(' -i  Select USBasp index ( default 0 )');
     writeln(' -b  Set Baud ( default 9600 )');
-    writeln(' -b  Set Crystal Hz ( default 12 MHz or 12000000 Hz )');
+    writeln(' -c  Set Crystal Hz ( default 12 MHz or 12000000 Hz )');
     writeln(' -r  Continuous read input');
     writeln(' -w  Interactive send output');
     writeln();

@@ -64,7 +64,7 @@ USBasp HIDUART Test App
  -l  List USBasp HID devices
  -i  Select USBasp index ( default 0 )
  -b  Set Baud ( default 9600 )
- -b  Set Crystal Hz ( default 12 MHz or 12000000 Hz )
+ -c  Set Crystal Hz ( default 12 MHz or 12000000 Hz )
  -r  Continuous read input
  -w  Interactive send output
 
