@@ -31,7 +31,7 @@
 
 static uchar replyBuffer[8];
 static uchar interruptBuffer[8];
-static uchar uartConf_Capabilities_FeatureReport[8] = { 0, 0, 0, 0, USBASP_CAP_0_TPI | USBASP_CAP_HIDUART, 0, 0, 0};
+static uchar uartConf_Capabilities_FeatureReport[8] = { 0, 0, 0, 0, USBASP_CAP_0_TPI | USBASP_CAP_HIDUART, USBASP_CAP_12MHZ_CLOCK, 0, 0};
 
 static uchar prog_state = PROG_STATE_IDLE;
 uchar prog_sck = USBASP_ISP_SCK_AUTO;
@@ -290,7 +290,7 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
 
             } else if(data[1] == USBASP_FUNC_GETCAPABILITIES) {
                  replyBuffer[0] = USBASP_CAP_0_TPI | USBASP_CAP_HIDUART;
-                 replyBuffer[1] = 0;
+                 replyBuffer[1] = USBASP_CAP_12MHZ_CLOCK;
                  replyBuffer[2] = 0;
                  replyBuffer[3] = 0;
                  len = 4;

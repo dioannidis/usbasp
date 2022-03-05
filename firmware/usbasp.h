@@ -39,7 +39,11 @@
 #define USBASP_CAP_0_TPI                0x01
 #define USBASP_CAP_6_UART               0x40
 #define USBASP_CAP_HIDUART              0x80
-#define USBASP_CAP_20MHZ_CLOCK          0x01
+
+#define USBASP_CAP_12MHZ_CLOCK          0x00
+#define USBASP_CAP_16MHZ_CLOCK          0x01
+#define USBASP_CAP_18MHZ_CLOCK          0x02
+#define USBASP_CAP_20MHZ_CLOCK          0x03
 
 /* programming state */
 #define PROG_STATE_IDLE                 0
