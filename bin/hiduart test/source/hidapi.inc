@@ -36,7 +36,11 @@ const
   LIBHIDAPI = 'hidapi';
   {$linklib hidapi}
 {$else}
+  {$ifdef D}
+  LIBHIDAPI = 'libhidapi-libusb.so';
+  {$else}
   LIBHIDAPI = 'hidapi-libusb';
+  {$endif}
 {$endif}
 
 {$endif}
