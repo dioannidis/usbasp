@@ -221,6 +221,8 @@ begin
 end;
 
 initialization
+  HidInit();
+
   USBaspHIDList := TUSBaspHIDDeviceList.Create;
 
 finalization;
@@ -231,5 +233,7 @@ finalization;
     Dec(i);
   end;
   USBaspHIDList.Free;
+
+  HidExit();
 
 end.

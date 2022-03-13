@@ -34,30 +34,11 @@ uses
 
 {$ifdef MSWINDOWS}
 
-{$if FPC_FULLVERSION > 30004}
-  {$define HIDAPI_CALL := WINAPI }
-{$else}
-  {$define HIDAPI_CALL := stdcall }
-{$endif}
-
-const
-  LIBHIDAPI = 'hidapi.dll';
-
 type
   PCWChar = PWideChar;
   TCWChar = WideChar;
 
 {$else}
-
-{$define HIDAPI_CALL := cdecl }
-
-const
-{$IFDEF Darwin}
-  LIBHIDAPI = 'hidapi';
-  {$linklib hidapi}
-{$ELSE}
-  LIBHIDAPI = 'hidapi-libusb';
-{$ENDIF}
 
 type
   PCWChar = ^TCWChar;
@@ -87,8 +68,8 @@ type
     function GetIndexedString(Index: Integer): UnicodeString;
     function GetError: UnicodeString;
     procedure Close;
-    function Open(VID: Word; PID: Word; Serial: {$ifdef MSWINDOWS}String{$else}UnicodeString{$endif}): PHidDevice; static;
-    function OpenPath(Path: String): PHidDevice; static;
+    function Open(VID: Word;PID: Word;const SerialNumber: {$ifdef MSWINDOWS}String{$else}UnicodeString{$endif}): PHidDevice; static;
+    function OpenPath(const DevicePath: String): PHidDevice; static;
   end;
 
   { THidDeviceInfo }
@@ -111,7 +92,7 @@ type
     procedure Free;
   end;
 
-  function HidInit: Integer;
+  function HidInit(const ALibraryName: String = ''): Integer;
   function HidExit: Integer;
   function HidApiVersion: String;
 
@@ -120,31 +101,14 @@ type
 
 implementation
 
+{$define HIDAPI_LOAD_DYNAMICALLY}
 
-{ imported external API functions }
-
-function hid_init: Integer; HIDAPI_CALL; external LIBHIDAPI;
-function hid_exit: Integer; HIDAPI_CALL; external LIBHIDAPI;
-function hid_enumerate(vendor_id: Word; product_id: Word): PHidDeviceInfo; HIDAPI_CALL; external LIBHIDAPI;
-procedure hid_free_enumeration(devs: PHidDeviceInfo); HIDAPI_CALL; external LIBHIDAPI;
-function hid_open(vendor_id: Word; product_id: Word; serial_number: PCWChar): PHidDevice; HIDAPI_CALL; external LIBHIDAPI;
-function hid_open_path(path: PChar): PHidDevice; HIDAPI_CALL; external LIBHIDAPI;
-function hid_write(device: PHidDevice; Data: Pointer; length: SizeInt): Integer; HIDAPI_CALL; external LIBHIDAPI;
-function hid_read_timeout(device: PHidDevice; Data: Pointer; length: SizeInt; millisec: Integer): Integer; HIDAPI_CALL; external LIBHIDAPI;
-function hid_read(device: PHidDevice; Data: Pointer; length: SizeInt): Integer; HIDAPI_CALL; external LIBHIDAPI;
-function hid_set_nonblocking(device: PHidDevice; nonblock: Integer): Integer; HIDAPI_CALL; external LIBHIDAPI;
-function hid_send_feature_report(device: PHidDevice; Data: Pointer; length: SizeInt): Integer; HIDAPI_CALL; external LIBHIDAPI;
-function hid_get_feature_report(device: PHidDevice; Data: Pointer; length: SizeInt): Integer; HIDAPI_CALL; external LIBHIDAPI;
-function hid_get_input_report(device: PHidDevice; Data: Pointer; length: SizeInt): Integer; HIDAPI_CALL; external LIBHIDAPI;
-procedure hid_close(device: PHidDevice); HIDAPI_CALL; external LIBHIDAPI;
-function hid_get_manufacturer_string(device: PHidDevice; str: PCWChar; maxlen: SizeInt): Integer; HIDAPI_CALL; external LIBHIDAPI;
-function hid_get_product_string(device: PHidDevice; str: PCWChar; maxlen: SizeInt): Integer; HIDAPI_CALL; external LIBHIDAPI;
-function hid_get_serial_number_string(device: PHidDevice; str: PCWChar; maxlen: SizeInt): Integer; HIDAPI_CALL; external LIBHIDAPI;
-function hid_get_indexed_string(device: PHidDevice; string_index: Integer; str: PCWChar; maxlen: SizeInt): Integer; HIDAPI_CALL; external LIBHIDAPI;
-function hid_error(device: PHidDevice): PCWChar; HIDAPI_CALL; external LIBHIDAPI;
-{$ifdef MSWINDOWS}
-function hid_version_str: PChar; HIDAPI_CALL; external LIBHIDAPI;
+{$ifdef HIDAPI_LOAD_DYNAMICALLY}
+uses
+  dynlibs;
 {$endif}
+
+{$i hidapi.inc}
 
 { helper functions for dealing with widechar strings }
 
@@ -194,23 +158,34 @@ end;
 
 function HidApiVersion: string;
 begin
-{$ifdef MSWINDOWS}
-  result := hid_version_str;
-{$else}
-  result := '';
+  Result := '0.9.0_or_older';
+{$if (HIDAPI_VERSION > 0090) and defined(S)}
+  Result := hid_version_str();
+{$elseif defined(D)}
+  if Pointer(hid_version_str) <> nil then
+    Result := hid_version_str();
 {$endif}
 end;
 
 { Initialize and deinitialize the HIDAPI }
 
-function HidInit: Integer;
+function HidInit(const ALibraryName: String = ''): Integer;
 begin
-  Result :=  hid_init;
+{$ifdef HIDAPI_LOAD_DYNAMICALLY}
+  if ALibraryName <> '' then
+    InitializeHidApi(LIBHIDAPI)
+  else
+    InitializeHidApi(LIBHIDAPI);
+{$endif}
+  Result :=  hid_init();
 end;
 
 function HidExit: Integer;
 begin
-  Result :=  hid_exit;
+  Result :=  hid_exit();
+{$ifdef HIDAPI_LOAD_DYNAMICALLY}
+  ReleaseHidApi();
+{$endif}
 end;
 
 { THidDeviceInfo }
@@ -249,7 +224,13 @@ end;
 
 function THidDevice.GetInputReport(const Data; Length: SizeInt): SizeInt;
 begin
-  Result :=  hid_get_input_report(@Self, @Data, Length);
+  Result := -1;
+{$if (HIDAPI_VERSION > 0090) and defined(S)}
+  hid_get_input_report(@Self, @Data, Length);
+{$elseif defined(D)}
+  if Pointer(hid_get_input_report) <> nil then
+    hid_get_input_report(@Self, @Data, Length);
+{$endif}
 end;
 
 function THidDevice.SendFeatureReport(const Data; Length: SizeInt): SizeInt;
@@ -304,39 +285,30 @@ begin
   hid_close(@Self);
 end;
 
-function THidDevice.Open(VID: Word; PID: Word; Serial: {$ifdef MSWINDOWS}String{$else}UnicodeString{$endif}): PHidDevice;
+function THidDevice.Open(VID: Word;PID: Word;const SerialNumber: {$ifdef MSWINDOWS}String{$else}UnicodeString{$endif}): PHidDevice;
 var
 {$ifdef MSWINDOWS}
-  WS: UnicodeString;
+  WS: array[0..255] of TCWChar;
 {$else}
   WS: TCWCharArray;
 {$endif}
 begin
+  if Length(SerialNumber) > 1 then
+  begin
 {$ifdef MSWINDOWS}
-  WS := Serial;
+    StringToWideChar(SerialNumber, @WS[0], Length(SerialNumber) + 1);
 {$else}
-  WS := UnicodeStringToTCWCharNullterminated(Serial);
+    WS := UnicodeStringToTCWCharNullterminated(SerialNumber);
 {$endif}
-
-  if Length(WS) > 1 then
-{$ifdef MSWINDOWS}
-    Result := hid_open(VID, PID, PCWChar(WS))
-{$else}
     Result := hid_open(VID, PID, @WS[0])
-{$endif}
+  end
   else
     Result := hid_open(VID, PID, nil);
 end;
 
-function THidDevice.OpenPath(Path: String): PHidDevice;
+function THidDevice.OpenPath(const DevicePath: String): PHidDevice;
 begin
-  Result :=  hid_open_path(PChar(Path));
+  Result :=  hid_open_path(PChar(DevicePath));
 end;
-
-initialization
-  HidInit;
-
-finalization
-  HidExit;
 
 end.
