@@ -12,7 +12,7 @@ This USBasp firmware is based on [a fork by Ralph Doncaster]. Original fork read
 
 ### Avrdude
 
-Pre-built avrdude 6.3 and 6.4, windows executables, if needed, is in the bin\avrdude-winusb directory. For avrdude v7 the official binary from [avrdudes/avrdude] doesn't support composite devices as this firmware implements. Use the unofficial build from [mcuee] repo.
+Pre-built avrdude 6.3 and 6.4, windows executables, if needed, is in the bin\avrdude-winusb directory. For avrdude v7 the official windows binary from [avrdudes/avrdude] uses libwinusb instead of libusb, which doesn't support composite devices as this firmware implements. Please use the unofficial build from [mcuee] repo.
 
 ### UART HID protocol
 
