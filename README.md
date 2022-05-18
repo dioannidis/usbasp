@@ -8,11 +8,11 @@ This USBasp firmware is based on [a fork by Ralph Doncaster]. Original fork read
 - From version 1.08 the firmware is [WCID] compliant, meaning it should work on Windows without any driver or .inf install.
 - From version 1.09 a ( reliable at 9600 Baud, with 120ms - 160ms intervals for higher speeds see note at UART HID protocol ) UART HID implementation is added for debugging purposes. USBasp will appear as a composite device with a WINUSB interface and a HID interface.
 
-> Note: A pre-built hex file for the mega8 (main.hex) is in the firmware directory, along with m88.hex for the mega88.
+> Note: A pre-built hex file for the mega8 (main.hex) is in the firmware directory, along with m88.hex for the mega88. Build with [MSYS2] and [avr8-gnu-toolchain (3.6.2.17778)] from Microchip, on a Windows 10 box.
 
 ### Avrdude
 
-Pre-built avrdude 6.3 and 6.4, windows executables, if needed, is in the bin\avrdude-winusb directory. Build with [MSYS2] and [avr8-gnu-toolchain (3.6.2.17778)] from Microchip, on a Windows 10 box.
+Pre-built avrdude 6.3 and 6.4, windows executables, if needed, is in the bin\avrdude-winusb directory. For avrdude v7 the official binary from [avrdudes/avrdude] doesn't support composite devices as this firmware implements. Use the unofficial build from [mcuee] repo.
 
 ### UART HID protocol
 
@@ -88,3 +88,6 @@ Read from USBasp at index 1 with 19200 baud from a device with 20 MHz crystal
 [MSYS2]: <https://www.msys2.org/>
 [avr8-gnu-toolchain (3.6.2.17778)]: <https://www.microchip.com/en-us/tools-resources/develop/microchip-studio/gcc-compilers>
 [UART Flags]: <https://github.com/dioannidis/usbasp/blob/167bf1c785b353cba206a0dbcc7d322f7f49d0b9/firmware/usbasp.h#L76)>
+[mcuee]: <https://github.com/mcuee/avrdude/releases/tag/v7.0>
+[avrdudes/avrdude]: <https://github.com/avrdudes/avrdude>
+
