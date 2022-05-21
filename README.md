@@ -52,7 +52,9 @@ To disable the UART, send a feature set report, with the prescaler bytes as zero
 
 ### USBaspHIDUART utility
 
-The USBaspHIDUART is a simple console utility, used for testing the HID UART implementation. Pre-built windows i386, x86_64 binaries and linux x86_64 binary ( builded on Debian buster ) is in the bin\hiduart test\ directory.
+The USBaspHIDUART is a simple console utility, used for testing the HID UART implementation. 
+
+Pre-built windows i386, x86_64 and linux x86_64 ( builded on Debian Buster with hidapi libusb backend ) shared binaries is in the bin\hiduart test\ directory.
 
 This is the help page ( USBaspHIDUART.exe -h ) :
 
