@@ -253,6 +253,7 @@ type
       Exit;
     end;
 
+    WriteHelp;
     // stop program loop
     Terminate;
   end;
