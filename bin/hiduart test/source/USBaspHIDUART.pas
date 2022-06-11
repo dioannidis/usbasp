@@ -31,7 +31,7 @@ program USBaspHIDUART;
 
 uses
  {$IFDEF UNIX} {$IFDEF UseCThreads}
-  cthreads,   {$ENDIF}   {$ENDIF}
+  cthreads,    {$ENDIF}    {$ENDIF}
   Classes,
   SysUtils,
   CustApp,
@@ -56,7 +56,7 @@ type
     prescaler: word;
     rbyte: byte;
     FileIn: TFileStream;
-    SendBuf: Boolean;
+    SendBuf: boolean;
     baud: integer = 9600;
     index: byte = 0;
     crystal: integer = 12000000;
@@ -64,8 +64,8 @@ type
 
   begin
     // quick check parameters
-    ErrorMsg := CheckOptions('h,l,r,w,i,b,c', ['help', 'list', 'read-input',
-      'send-output', 'index', 'baud', 'crystal']);
+    ErrorMsg := CheckOptions('h,l,r,w,i,b,c', ['help', 'list',
+      'read-input', 'send-output', 'index', 'baud', 'crystal']);
     if ErrorMsg <> '' then
     begin
       ShowException(Exception.Create(ErrorMsg));
@@ -106,7 +106,7 @@ type
 
     if HasOption('r', 'read-input') then
     begin
-      usbasp_enumerate(false);
+      usbasp_enumerate(False);
       usbasp_open(USBaspHIDList[index]);
 
       usbasp_uart_get_conf(ReadBuffer);
@@ -117,7 +117,7 @@ type
       usbasp_uart_set_conf(ReadBuffer);
       usbasp_uart_get_conf(ReadBuffer);
 
-      prescaler:= crystal div 8 div baud - 1;
+      prescaler := crystal div 8 div baud - 1;
 
       ReadBuffer[0] := lo(prescaler);
       ReadBuffer[1] := hi(prescaler);
@@ -127,16 +127,16 @@ type
       usbasp_uart_set_conf(ReadBuffer);
       usbasp_uart_get_conf(ReadBuffer);
 
-      while true do
+      while True do
       begin
         usbasp_read(ReadBuffer);
-        RcvByte:=ReadBuffer[7];
+        RcvByte := ReadBuffer[7];
         if (RcvByte > 0) then
         begin
           if RcvByte > 7 then
-            RcvByte:=8;
+            RcvByte := 8;
           for x := 0 to RcvByte - 1 do
-            Write(Char(ReadBuffer[x]));
+            Write(char(ReadBuffer[x]));
         end;
       end;
 
@@ -148,7 +148,7 @@ type
 
     if HasOption('w', 'send-output') then
     begin
-      usbasp_enumerate(false);
+      usbasp_enumerate(False);
       usbasp_open(USBaspHIDList[index]);
 
       usbasp_uart_get_conf(ReadBuffer);
@@ -159,7 +159,7 @@ type
       usbasp_uart_set_conf(ReadBuffer);
       usbasp_uart_get_conf(ReadBuffer);
 
-      prescaler:= crystal div 8 div baud - 1;
+      prescaler := crystal div 8 div baud - 1;
 
       ReadBuffer[0] := lo(prescaler);
       ReadBuffer[1] := hi(prescaler);
@@ -169,7 +169,7 @@ type
       usbasp_uart_set_conf(ReadBuffer);
       usbasp_uart_get_conf(ReadBuffer);
 
-      while true do
+      while True do
       begin
         x := 1;
         SendBuf := False;
@@ -178,12 +178,12 @@ type
         pos := 0;
         while pos < tmp.Length do
         begin
-          ReadBuffer[x-1] := ord(tmp[pos+1]);
+          ReadBuffer[x - 1] := Ord(tmp[pos + 1]);
           Inc(pos);
-          if ( x < 8) and (pos = tmp.length) then
+          if (x < 8) and (pos = tmp.length) then
           begin
             ReadBuffer[7] := x;
-            SendBuf:=true;
+            SendBuf := True;
           end
           else
           begin
@@ -195,7 +195,7 @@ type
                 ReadBuffer[7] := 7;
               end;
               x := 1;
-              SendBuf:=true;
+              SendBuf := True;
             end
             else
               Inc(x);
@@ -203,7 +203,7 @@ type
           if SendBuf then
           begin
             usbasp_write(ReadBuffer);
-            SendBuf:=false;
+            SendBuf := False;
           end;
         end;
       end;
