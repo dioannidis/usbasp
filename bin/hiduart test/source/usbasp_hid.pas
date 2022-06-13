@@ -72,7 +72,7 @@ var
 implementation
 
 uses
-  Math, StrUtils;
+  StrUtils;
 
 var
   HidBuffer: array[0..7] of byte;
@@ -153,7 +153,6 @@ procedure usbasp_open(const AUSBaspHIDDevice: PUSBaspHIDDevice);
 begin
   USBaspHIDDevice := AUSBaspHIDDevice;
   USBaspHIDDevice^.HidDevice := THidDevice.OpenPath(AUSBaspHIDDevice^.Path);
-  //USBaspHIDDevice^.HidDevice^.Open($16C0, $05DC, '');
 end;
 
 procedure usbasp_close;
@@ -163,29 +162,18 @@ begin
 end;
 
 function usbasp_read(var Data): integer;
-var
-  HidSize: SizeInt;
 begin
-  //FillChar(HidBuffer, 9, 0);
-  // Report size plus added Report ID
-  HidSize := USBaspHIDDevice^.HidDevice^.ReadTimeout(HidBuffer, USBaspHIDDevice^.ReportSize, 20);
-
-  Move(HidBuffer, Data, HidSize);
-  Result := HidSize;
+  Result := USBaspHIDDevice^.HidDevice^.ReadTimeout(Data, USBaspHIDDevice^.ReportSize, 20);
 end;
 
 function usbasp_write(var Data): integer;
-var
-  HidSize: SizeInt;
 begin
-  //  // Add Report ID
+  // Add Report ID
   HidBuffer[0] := $00;
   Move(Data, HidBuffer[1], USBaspHIDDevice^.ReportSize + 1);
 
   // Report size plus added Report ID
-  HidSize := USBaspHIDDevice^.HidDevice^.Write(HidBuffer, USBaspHIDDevice^.ReportSize + 1);
-
-  Result := HidSize;
+  Result := USBaspHIDDevice^.HidDevice^.Write(HidBuffer, USBaspHIDDevice^.ReportSize + 1);
 end;
 
 function usbasp_uart_get_conf(var Data): integer;
@@ -215,7 +203,7 @@ begin
   // Report size plus added Report ID
   HidSize := USBaspHIDDevice^.HidDevice^.SendFeatureReport(HidBuffer, USBaspHIDDevice^.ReportSize + 1);
 
-  Move(HidBuffer, Data, HidSize);
+  Move(HidBuffer[1], Data, HidSize - 1);
 
   Result := HidSize;
 end;
