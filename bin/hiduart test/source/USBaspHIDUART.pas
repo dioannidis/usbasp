@@ -165,7 +165,6 @@ type
           end;
           if KeyPressed then
           begin
-            Sleep(200);
             if ReadKey = ^C then
               Break;
           end;
