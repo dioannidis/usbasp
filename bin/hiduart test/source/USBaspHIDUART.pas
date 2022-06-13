@@ -30,13 +30,17 @@ program USBaspHIDUART;
 {$macro on}
 
 uses
- {$IFDEF UNIX} {$IFDEF UseCThreads}
-  cthreads,      {$ENDIF}      {$ENDIF}
+ {$IFDEF UNIX}
+  {$IFDEF UseCThreads}
+   cthreads,
+   {$ENDIF}
+  {$ENDIF}
   Classes,
   SysUtils,
   CustApp,
   crt,
-  usbasp_hid;
+  usbasp_hid,
+  usbasp_threads;
 
 type
 
@@ -52,16 +56,18 @@ type
   procedure TUSBaspHIDUARTTest.DoRun;
   var
     ErrorMsg: string;
-    ReadBuffer: array[0..7] of byte;
+    HidPacketRead: array[0..7] of byte;
     x, RcvByte, pos, size: integer;
     prescaler: word;
-    rbyte: byte;
-    FileIn: TFileStream;
+    //rbyte: byte;
+    //FileIn: TFileStream;
     SendBuf: boolean;
     baud: integer = 9600;
     index: byte = 0;
     crystal: integer = 12000000;
     tmp: string;
+    ReadThread: TThreadRead;
+    RingBuffer: TRingBuffer;
 
   begin
     // quick check parameters
@@ -110,30 +116,30 @@ type
       usbasp_enumerate(False);
       usbasp_open(USBaspHIDList[index]);
 
-      usbasp_uart_get_conf(ReadBuffer);
+      usbasp_uart_get_conf(HidPacketRead);
 
-      ReadBuffer[0] := 0;
-      ReadBuffer[1] := 0;
-      usbasp_uart_set_conf(ReadBuffer);
+      HidPacketRead[0] := 0;
+      HidPacketRead[1] := 0;
+      usbasp_uart_set_conf(HidPacketRead);
 
-      usbasp_uart_get_conf(ReadBuffer);
+      usbasp_uart_get_conf(HidPacketRead);
       if (not HasOption('c', 'crystal')) then
       begin
-        case ReadBuffer[5] of
-        1: crystal := 16000000;
-        2: crystal := 18000000;
-        3: crystal := 20000000;
+        case HidPacketRead[5] of
+          1: crystal := 16000000;
+          2: crystal := 18000000;
+          3: crystal := 20000000;
         end;
       end;
 
       prescaler := crystal div 8 div baud - 1;
 
-      ReadBuffer[0] := lo(prescaler);
-      ReadBuffer[1] := hi(prescaler);
-      ReadBuffer[2] := 24;
-      ReadBuffer[3] := 0;
+      HidPacketRead[0] := lo(prescaler);
+      HidPacketRead[1] := hi(prescaler);
+      HidPacketRead[2] := 24;
+      HidPacketRead[3] := 0;
 
-      usbasp_uart_set_conf(ReadBuffer);
+      usbasp_uart_set_conf(HidPacketRead);
 
       WriteLn();
       WriteLn('USBasp device configuration');
@@ -142,25 +148,40 @@ type
       WriteLn('Baud    : ', baud);
       WriteLn();
 
-      while True do
-      begin
-        usbasp_read(ReadBuffer);
-        RcvByte := ReadBuffer[7];
-        if (RcvByte > 0) then
+      RingBuffer := TRingBuffer.Create(1024);
+      ReadThread := TThreadRead.Create(RingBuffer);
+      try
+        while True do
         begin
-          if RcvByte > 7 then
-            RcvByte := 8;
-          for x := 0 to RcvByte - 1 do
-            Write(char(ReadBuffer[x]));
+          HidPacketRead[7] := 0;
+          RingBuffer.Read(HidPacketRead, 8);
+          if (HidPacketRead[7] > 0) then
+          begin
+            RcvByte := HidPacketRead[7];
+            if RcvByte > 7 then
+              RcvByte := 8;
+            for x := 0 to RcvByte - 1 do
+              Write(char(HidPacketRead[x]));
+          end;
+          if KeyPressed then
+          begin
+            Sleep(200);
+            if ReadKey = ^C then
+              Break;
+          end;
         end;
-        if KeyPressed then
-          if ReadKey = ^C then
-            Break;
+      finally
+        ReadThread.Terminate;
+        ReadThread.WaitFor;
+        ReadThread.Free;
+
+        RingBuffer.Free;
       end;
 
-      ReadBuffer[0] := 0;
-      ReadBuffer[1] := 0;
-      usbasp_uart_set_conf(ReadBuffer);
+
+      HidPacketRead[0] := 0;
+      HidPacketRead[1] := 0;
+      usbasp_uart_set_conf(HidPacketRead);
 
       usbasp_close();
 
@@ -173,29 +194,29 @@ type
       usbasp_enumerate(False);
       usbasp_open(USBaspHIDList[index]);
 
-      usbasp_uart_get_conf(ReadBuffer);
+      usbasp_uart_get_conf(HidPacketRead);
 
-      ReadBuffer[0] := 0;
-      ReadBuffer[1] := 0;
-      usbasp_uart_set_conf(ReadBuffer);
+      HidPacketRead[0] := 0;
+      HidPacketRead[1] := 0;
+      usbasp_uart_set_conf(HidPacketRead);
 
-      usbasp_uart_get_conf(ReadBuffer);
+      usbasp_uart_get_conf(HidPacketRead);
       if (not HasOption('c', 'crystal')) then
       begin
-        case ReadBuffer[5] of
-        1: crystal := 16000000;
-        2: crystal := 18000000;
-        3: crystal := 20000000;
+        case HidPacketRead[5] of
+          1: crystal := 16000000;
+          2: crystal := 18000000;
+          3: crystal := 20000000;
         end;
       end;
       prescaler := crystal div 8 div baud - 1;
 
-      ReadBuffer[0] := lo(prescaler);
-      ReadBuffer[1] := hi(prescaler);
-      ReadBuffer[2] := 24;
-      ReadBuffer[3] := 0;
+      HidPacketRead[0] := lo(prescaler);
+      HidPacketRead[1] := hi(prescaler);
+      HidPacketRead[2] := 24;
+      HidPacketRead[3] := 0;
 
-      usbasp_uart_set_conf(ReadBuffer);
+      usbasp_uart_set_conf(HidPacketRead);
 
       WriteLn();
       WriteLn('USBasp device configuration');
@@ -213,21 +234,21 @@ type
         pos := 0;
         while pos < tmp.Length do
         begin
-          ReadBuffer[x - 1] := Ord(tmp[pos + 1]);
+          HidPacketRead[x - 1] := Ord(tmp[pos + 1]);
           Inc(pos);
           if (x < 8) and (pos = tmp.length) then
           begin
-            ReadBuffer[7] := x;
+            HidPacketRead[7] := x;
             SendBuf := True;
           end
           else
           begin
             if (x = 8) then
             begin
-              if ReadBuffer[7] < 7 then
+              if HidPacketRead[7] < 7 then
               begin
                 pos := pos - 1;
-                ReadBuffer[7] := 7;
+                HidPacketRead[7] := 7;
               end;
               x := 1;
               SendBuf := True;
@@ -237,13 +258,16 @@ type
           end;
           if SendBuf then
           begin
-            usbasp_write(ReadBuffer);
+            usbasp_write(HidPacketRead);
             SendBuf := False;
           end;
         end;
         if KeyPressed then
+        begin
+          sleep(5);
           if ReadKey = ^C then
             Break;
+        end;
       end;
 
       //FileIn := TFilestream.Create('test.txt', fmOpenRead);
@@ -253,20 +277,20 @@ type
       //  SendBuf := False;
       //  while FileIn.Position < FileIn.Size do
       //  begin
-      //    ReadBuffer[x-1] := FileIn.ReadByte;
+      //    HidPacketRead[x-1] := FileIn.ReadByte;
       //    if ( x < 8) and (FileIn.Position = FileIn.Size) then
       //    begin
-      //      ReadBuffer[7] := x;
+      //      HidPacketRead[7] := x;
       //      SendBuf:=true;
       //    end
       //    else
       //    begin
       //      if (x = 8) then
       //      begin
-      //        if ReadBuffer[7] < 7 then
+      //        if HidPacketRead[7] < 7 then
       //        begin
       //          FileIn.Seek(FileIn.Position - 1, soFromBeginning);
-      //          ReadBuffer[7] := 7;
+      //          HidPacketRead[7] := 7;
       //        end;
       //        x := 1;
       //        SendBuf:=true;
@@ -276,7 +300,7 @@ type
       //    end;
       //    if SendBuf then
       //    begin
-      //      usbasp_write(ReadBuffer);
+      //      usbasp_write(HidPacketRead);
       //      SendBuf:=false;
       //    end;
       //  end;
@@ -285,9 +309,9 @@ type
       //end;
       //end;
 
-      ReadBuffer[0] := 0;
-      ReadBuffer[1] := 0;
-      usbasp_uart_set_conf(ReadBuffer);
+      HidPacketRead[0] := 0;
+      HidPacketRead[1] := 0;
+      usbasp_uart_set_conf(HidPacketRead);
 
       usbasp_close();
 
