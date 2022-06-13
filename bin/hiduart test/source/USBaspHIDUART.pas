@@ -31,10 +31,11 @@ program USBaspHIDUART;
 
 uses
  {$IFDEF UNIX} {$IFDEF UseCThreads}
-  cthreads,    {$ENDIF}    {$ENDIF}
+  cthreads,      {$ENDIF}      {$ENDIF}
   Classes,
   SysUtils,
   CustApp,
+  crt,
   usbasp_hid;
 
 type
@@ -113,9 +114,17 @@ type
 
       ReadBuffer[0] := 0;
       ReadBuffer[1] := 0;
-
       usbasp_uart_set_conf(ReadBuffer);
+
       usbasp_uart_get_conf(ReadBuffer);
+      if (not HasOption('c', 'crystal')) then
+      begin
+        case ReadBuffer[5] of
+        1: crystal := 16000000;
+        2: crystal := 18000000;
+        3: crystal := 20000000;
+        end;
+      end;
 
       prescaler := crystal div 8 div baud - 1;
 
@@ -125,7 +134,13 @@ type
       ReadBuffer[3] := 0;
 
       usbasp_uart_set_conf(ReadBuffer);
-      usbasp_uart_get_conf(ReadBuffer);
+
+      WriteLn();
+      WriteLn('USBasp device configuration');
+      WriteLn('---------------------------');
+      WriteLn('Crystal : ', crystal);
+      WriteLn('Baud    : ', baud);
+      WriteLn();
 
       while True do
       begin
@@ -138,10 +153,17 @@ type
           for x := 0 to RcvByte - 1 do
             Write(char(ReadBuffer[x]));
         end;
+        if KeyPressed then
+          if ReadKey = ^C then
+            Break;
       end;
 
+      ReadBuffer[0] := 0;
+      ReadBuffer[1] := 0;
+      usbasp_uart_set_conf(ReadBuffer);
+
       usbasp_close();
-      ReadLn;
+
       Terminate;
       Exit;
     end;
@@ -155,10 +177,17 @@ type
 
       ReadBuffer[0] := 0;
       ReadBuffer[1] := 0;
-
       usbasp_uart_set_conf(ReadBuffer);
-      usbasp_uart_get_conf(ReadBuffer);
 
+      usbasp_uart_get_conf(ReadBuffer);
+      if (not HasOption('c', 'crystal')) then
+      begin
+        case ReadBuffer[5] of
+        1: crystal := 16000000;
+        2: crystal := 18000000;
+        3: crystal := 20000000;
+        end;
+      end;
       prescaler := crystal div 8 div baud - 1;
 
       ReadBuffer[0] := lo(prescaler);
@@ -167,7 +196,13 @@ type
       ReadBuffer[3] := 0;
 
       usbasp_uart_set_conf(ReadBuffer);
-      usbasp_uart_get_conf(ReadBuffer);
+
+      WriteLn();
+      WriteLn('USBasp device configuration');
+      WriteLn('---------------------------');
+      WriteLn('Crystal : ', crystal);
+      WriteLn('Baud    : ', baud);
+      WriteLn();
 
       while True do
       begin
@@ -206,6 +241,9 @@ type
             SendBuf := False;
           end;
         end;
+        if KeyPressed then
+          if ReadKey = ^C then
+            Break;
       end;
 
       //FileIn := TFilestream.Create('test.txt', fmOpenRead);
@@ -247,8 +285,12 @@ type
       //end;
       //end;
 
+      ReadBuffer[0] := 0;
+      ReadBuffer[1] := 0;
+      usbasp_uart_set_conf(ReadBuffer);
+
       usbasp_close();
-      ReadLn;
+
       Terminate;
       Exit;
     end;
