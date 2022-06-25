@@ -40,20 +40,21 @@ type
 
   TRingBuffer = class(TObject)
   private
-    FLock: TRTLCriticalSection;
     FMemory: Pointer;
     FSize, FReadIndex, FWriteIndex, FCount: integer;
-    function GetCount: integer;
-    procedure SetCount(const AValue: integer);
+    function GetIsEmpty: boolean;
+    function GetIsFull: boolean;
   public
     constructor Create(const ASize: integer);
     destructor Destroy; override;
-    procedure Read(var Data; Count: integer);
-    procedure Write(var Data; Count: integer);
+    procedure Read(out AData; const ACount: integer);
+    procedure Write(var AData; const ACount: integer);
     function ReadByte: byte;
   published
-    property Count: integer read GetCount;
+    property Count: integer read FCount;
     property Size: integer read FSize;
+    property IsEmpty: boolean read GetIsEmpty;
+    property IsFull: boolean read GetIsFull;
   end;
 
   { TThreadRead }
@@ -85,19 +86,14 @@ uses
 
 { TRingBuffer }
 
-function TRingBuffer.GetCount: integer;
+function TRingBuffer.GetIsEmpty: boolean; inline;
 begin
-  Result := FCount;
+  Result :=  FCount = 0;
 end;
 
-procedure TRingBuffer.SetCount(const AValue: integer);
+function TRingBuffer.GetIsFull: boolean; inline;
 begin
-  EnterCriticalSection(FLock);
-  try
-    FCount := AValue;
-  finally
-    LeaveCriticalSection(FLock);
-  end;
+  Result :=  FCount = FSize;
 end;
 
 constructor TRingBuffer.Create(const ASize: integer);
@@ -108,55 +104,73 @@ begin
   FSize := ASize;
   FMemory := GetMem(FSize);
   FillChar(FMemory^, FSize, #0);
-  InitCriticalSection(FLock);
 end;
 
 destructor TRingBuffer.Destroy;
 begin
   Freemem(FMemory, FSize);
-  DoneCriticalSection(FLock);
   inherited Destroy;
 end;
 
-procedure TRingBuffer.Read(var Data; Count: integer);
+procedure TRingBuffer.Read(out AData; const ACount: integer);
+var
+  locCount: Integer;
+  PData: PByte;
+
 begin
-  if FCount = 0 then
+  if IsEmPty or (ACount = 0) then
     Exit;
-  if Count > FCount then
-    Count := FCount;
-  if (Count + FReadIndex) > FSize then
+
+  PData := @AData;
+  locCount := ACount;
+
+  if locCount > FCount then
+    locCount := FCount;
+
+  if (locCount + FReadIndex) > FSize then
   begin
-    Move((FMemory + FReadIndex)^, Data, FSize - FReadIndex);
-    Move(FMemory^, PByteArray(@Data)[FSize - FReadIndex], Count - (FSize - FReadIndex));
-    FReadIndex := Count - (FSize - FReadIndex);
+    Move((FMemory + FReadIndex)^, PData^, FSize - FReadIndex);
+    Inc(PData, FSize - FReadIndex);
+    Move(FMemory^, PData^, locCount - (FSize - FReadIndex));
+    FReadIndex := locCount - (FSize - FReadIndex);
   end
   else
   begin
-    Move((FMemory + FReadIndex)^, Data, Count);
-    FReadIndex := FReadIndex + Count;
+    Move((FMemory + FReadIndex)^, PData^, locCount);
+    FReadIndex := FReadIndex + locCount;
   end;
-  FCount := FCount - Count;
+
+  InterlockedExchangeAdd(FCount, -locCount);
 end;
 
-procedure TRingBuffer.Write(var Data; Count: integer);
+procedure TRingBuffer.Write(var AData; const ACount: integer);
+var
+  locCount: Integer;
+  PData: Pointer;
 begin
-  if FSize = FCount then
+  if IsFull or (ACount = 0) then
     Exit;
-  if Count > FSize - FCount then
-    Count := FSize - FCount;
-  if (Count + FWriteIndex) > FSize then
+
+  PData := @AData;
+  locCount := ACount;
+
+  if locCount > FSize - FCount then
+    locCount := FSize - FCount;
+
+  if (locCount + FWriteIndex) > FSize then
   begin
-    Move(Data, (FMemory + FWriteIndex)^, FSize - FWriteIndex);
-    Move(PByteArray(@Data)[FSize - FWriteIndex], FMemory^, Count -
-      (FSize - FWriteIndex));
-    FWriteIndex := Count - (FSize - FWriteIndex);
+    Move(PData^, (FMemory + FWriteIndex)^, FSize - FWriteIndex);
+    Inc(PData, FSize - FWriteIndex);
+    Move(PData^, FMemory^, locCount - (FSize - FWriteIndex));
+    FWriteIndex := locCount - (FSize - FWriteIndex);
   end
   else
   begin
-    Move(Data, (FMemory + FWriteIndex)^, Count);
-    FWriteIndex := FWriteIndex + Count;
+    Move(PData^, (FMemory + FWriteIndex)^, locCount);
+    FWriteIndex := FWriteIndex + locCount;
   end;
-  FCount := FCount + Count;
+
+  InterlockedExchangeAdd(FCount, locCount);
 end;
 
 function TRingBuffer.ReadByte: byte;
@@ -174,7 +188,10 @@ begin
     if usbasp_read(USBAspHidPacket) <> 0 then
     begin
       if (USBAspHidPacket[7] > 0) then
-        FBuffer.Write(USBAspHidPacket, 8);
+        if (USBAspHidPacket[7] > 7) then
+          FBuffer.Write(USBAspHidPacket, 8)
+        else
+          FBuffer.Write(USBAspHidPacket, USBAspHidPacket[7]);
     end;
   until Terminated;
 end;
@@ -192,9 +209,10 @@ var
   USBAspHidPacket: array[0..7] of byte;
 begin
   repeat
-    if usbasp_read(USBAspHidPacket) <> 0 then
-      if (USBAspHidPacket[7] > 0) then
-        FBuffer.Write(USBAspHidPacket, 8);
+    if not FBuffer.IsEmpty then
+    begin
+{ TODO : Implement packeting }
+    end;
   until Terminated;
 end;
 
