@@ -59,8 +59,6 @@ type
 procedure usbasp_enumerate(const APrintInfo: boolean = False);
 procedure usbasp_open(const AUSBaspHIDDevice: PUSBaspHIDDevice);
 procedure usbasp_close;
-//function usbasp_command(var Data;
-//  ARequestSize, AExpectedResponceSize: integer): integer;
 function usbasp_read(var Data): integer;
 function usbasp_write(var Data): integer;
 function usbasp_uart_set_conf(var Data): integer;
@@ -163,7 +161,7 @@ end;
 
 function usbasp_read(var Data): integer;
 begin
-  Result := USBaspHIDDevice^.HidDevice^.ReadTimeout(Data, USBaspHIDDevice^.ReportSize, 20);
+  Result := USBaspHIDDevice^.HidDevice^.ReadTimeout(Data, USBaspHIDDevice^.ReportSize, 250);
 end;
 
 function usbasp_write(var Data): integer;
@@ -180,9 +178,8 @@ function usbasp_uart_get_conf(var Data): integer;
 var
   HidSize: SizeInt;
 begin
-  //  // Add Report ID
+  // Add Report ID
   HidBuffer[0] := $00;
-  //Move(Data, HidBuffer[1], USBaspHIDDevice^.ReportSize + 1);
 
   // Report size plus added Report ID
   HidSize := USBaspHIDDevice^.HidDevice^.GetFeatureReport(HidBuffer, USBaspHIDDevice^.ReportSize + 1) - 1;
@@ -196,7 +193,7 @@ function usbasp_uart_set_conf(var Data): integer;
 var
   HidSize: SizeInt;
 begin
-  //  // Add Report ID
+  // Add Report ID
   HidBuffer[0] := $00;
   Move(Data, HidBuffer[1], USBaspHIDDevice^.ReportSize + 1);
 
@@ -210,7 +207,6 @@ end;
 
 initialization
   HidInit();
-
   USBaspHIDList := TUSBaspHIDDeviceList.Create;
 
 finalization;
@@ -221,7 +217,6 @@ finalization;
     Dec(i);
   end;
   USBaspHIDList.Free;
-
   HidExit();
 
 end.
