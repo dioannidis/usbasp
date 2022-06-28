@@ -32,7 +32,7 @@ unit usbasp_threads;
 interface
 
 uses
-  Classes, SysUtils;
+  Classes, SysUtils, usbasp_hid;
 
 type
 
@@ -43,8 +43,8 @@ type
     FMemory: Pointer;
     FSize,
     FReadIndex,
-    FWriteIndex,
-    FCount: integer;
+    FWriteIndex: Integer;
+    function GetCount: Integer;
     function GetIsEmpty: boolean;
     function GetIsFull: boolean;
   public
@@ -54,7 +54,7 @@ type
     function Write(var AData; const ACount: integer): Integer;
     procedure AdvanceReadIndex(const ACount: Integer);
   published
-    property Count: integer read FCount;
+    property Count: integer read GetCount;
     property Size: integer read FSize;
     property IsEmpty: boolean read GetIsEmpty;
     property IsFull: boolean read GetIsFull;
@@ -65,10 +65,11 @@ type
   TThreadRead = class(TThread)
   private
     FBuffer: TRingBuffer;
+    FUSBaspDevice: PUSBaspHIDDevice;
   protected
     procedure Execute; override;
   public
-    constructor Create(const ABuffer: TRingBuffer); reintroduce;
+    constructor Create(const AUSBaspDevice: PUSBaspHIDDevice; const ABuffer: TRingBuffer); reintroduce;
   end;
 
   { TWriteRead }
@@ -76,34 +77,39 @@ type
   TThreadWrite = class(TThread)
   private
     FBuffer: TRingBuffer;
+    FUSBaspDevice: PUSBaspHIDDevice;
   protected
     procedure Execute; override;
   public
-    constructor Create(const ABuffer: TRingBuffer); reintroduce;
+    constructor Create(const AUSBaspDevice: PUSBaspHIDDevice; const ABuffer: TRingBuffer); reintroduce;
   end;
 
 implementation
 
-uses
-  usbasp_hid;
-
 { TRingBuffer }
+
+function TRingBuffer.GetCount: Integer; inline;
+begin
+  if FWriteIndex >= FReadIndex then
+    Result := FWriteIndex - FReadIndex
+  else
+    Result := (FSize - FReadIndex) + FWriteIndex;
+end;
 
 function TRingBuffer.GetIsEmpty: boolean; inline;
 begin
-  Result := FCount = 0;
+  Result := GetCount = 0;
 end;
 
 function TRingBuffer.GetIsFull: boolean; inline;
 begin
-  Result :=  FCount = FSize;
+  Result :=  GetCount = FSize;
 end;
 
 constructor TRingBuffer.Create(const ASize: integer);
 begin
   FReadIndex := 0;
   FWriteIndex := 0;
-  FCount := 0;
   FSize := ASize;
   FMemory := GetMem(FSize);
   FillChar(FMemory^, FSize, #0);
@@ -117,7 +123,7 @@ end;
 
 procedure TRingBuffer.Read(out AData; const ACount: integer; const APeakAhead: Boolean = false);
 var
-  locCount, locReadIndex: Integer;
+  locCount, locReadIndex, locBufferCount: Integer;
   PData: PByte;
 begin
   if IsEmPty or (ACount = 0) then
@@ -126,15 +132,15 @@ begin
   PData := @AData;
   locCount := ACount;
   locReadIndex := FReadIndex;
+  locBufferCount := GetCount;
 
-  if locCount > FCount then
-    locCount := FCount;
+  if locCount > locBufferCount then
+    locCount := locBufferCount;
 
   if (locCount + locReadIndex) > FSize then
   begin
     Move((FMemory + locReadIndex)^, PData^, FSize - locReadIndex);
-    Inc(PData, FSize - locReadIndex);
-    Move(FMemory^, PData^, locCount - (FSize - locReadIndex));
+    Move(FMemory^, (PData + FSize - locReadIndex)^, locCount - (FSize - locReadIndex));
     locReadIndex := locCount - (FSize - locReadIndex);
   end
   else
@@ -144,15 +150,12 @@ begin
   end;
 
   if not APeakAhead then
-  begin
     FReadIndex := locReadIndex;
-    InterlockedExchangeAdd(FCount, -locCount);
-  end;
 end;
 
 function TRingBuffer.Write(var AData; const ACount: integer): Integer;
 var
-  locCount: Integer;
+  locCount, locBufferCount: Integer;
   PData: Pointer;
 begin
   Result := 0;
@@ -162,9 +165,10 @@ begin
 
   PData := @AData;
   locCount := ACount;
+  locBufferCount := GetCount;
 
-  if locCount > FSize - FCount then
-    locCount := FSize - FCount;
+  if locCount > FSize - locBufferCount then
+    locCount := FSize - locBufferCount;
 
   if (locCount + FWriteIndex) > FSize then
   begin
@@ -178,8 +182,6 @@ begin
     Move(PData^, (FMemory + FWriteIndex)^, locCount);
     FWriteIndex := FWriteIndex + locCount;
   end;
-
-  InterlockedExchangeAdd(FCount, locCount);
 
   Result := locCount;
 end;
@@ -200,7 +202,7 @@ begin
 
   FReadIndex := locReadIndex;
 
-  InterlockedExchangeAdd(FCount, -ACount);
+  //InterlockedExchangeAdd(FCount, -ACount);
 end;
 
 { TThreadRead }
@@ -210,7 +212,7 @@ var
   USBAspHidPacket: array[0..7] of byte = (0, 0, 0, 0, 0, 0, 0, 0);
 begin
   repeat
-    if usbasp_read(USBAspHidPacket) > 0 then
+    if usbasp_read(FUSBaspDevice, USBAspHidPacket) > 0 then
     begin
       if (USBAspHidPacket[7] > 0) then
       begin
@@ -223,10 +225,11 @@ begin
   until Terminated;
 end;
 
-constructor TThreadRead.Create(const ABuffer: TRingBuffer);
+constructor TThreadRead.Create(const AUSBaspDevice: PUSBaspHIDDevice; const ABuffer: TRingBuffer);
 begin
   inherited Create(False);
   FBuffer := ABuffer;
+  FUSBaspDevice:= AUSBaspDevice;
 end;
 
 { TThreadWrite }
@@ -258,7 +261,7 @@ begin
         FBuffer.Read(USBAspHidPacket, locCount);
         USBAspHidPacket[7] := locCount;
       end;
-      SendPacket := usbasp_write(USBAspHidPacket);
+      SendPacket := usbasp_write(FUSBaspDevice, USBAspHidPacket);
       if SendPacket > 0 then
         if SendPacket = 8 then
           FBuffer.AdvanceReadIndex(AdvanceAmount)
@@ -266,10 +269,11 @@ begin
   until Terminated;
 end;
 
-constructor TThreadWrite.Create(const ABuffer: TRingBuffer);
+constructor TThreadWrite.Create(const AUSBaspDevice: PUSBaspHIDDevice; const ABuffer: TRingBuffer);
 begin
   inherited Create(False);
   FBuffer := ABuffer;
+  FUSBaspDevice := AUSBaspDevice;
 end;
 
 

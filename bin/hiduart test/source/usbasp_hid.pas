@@ -58,11 +58,11 @@ type
 
 procedure usbasp_enumerate(const APrintInfo: boolean = False);
 procedure usbasp_open(const AUSBaspHIDDevice: PUSBaspHIDDevice);
-procedure usbasp_close;
-function usbasp_read(var Data): integer;
-function usbasp_write(var Data): integer;
-function usbasp_uart_set_conf(var Data): integer;
-function usbasp_uart_get_conf(var Data): integer;
+procedure usbasp_close(const AUSBaspHIDDevice: PUSBaspHIDDevice);
+function usbasp_read(const AUSBaspHIDDevice: PUSBaspHIDDevice; var Data): integer;
+function usbasp_write(const AUSBaspHIDDevice: PUSBaspHIDDevice; var Data): integer;
+function usbasp_uart_set_conf(const AUSBaspHIDDevice: PUSBaspHIDDevice; var Data): integer;
+function usbasp_uart_get_conf(const AUSBaspHIDDevice: PUSBaspHIDDevice; var Data): integer;
 
 var
   USBaspHIDList: TUSBaspHIDDeviceList;
@@ -73,7 +73,6 @@ uses
   StrUtils;
 
 var
-  USBaspHIDDevice: PUSBaspHIDDevice;
   i: integer;
 
 function enumerate_hid(AUSBaspHIDDeviceList: TUSBaspHIDDeviceList): integer;
@@ -136,7 +135,7 @@ begin
     for USBasp in USBaspHIDList do
     begin
       usbasp_open(USBasp);
-      usbasp_close;
+      usbasp_close(USBasp);
       if APrintInfo then
         PrintInfo(USBasp);
     end;
@@ -148,39 +147,36 @@ end;
 
 procedure usbasp_open(const AUSBaspHIDDevice: PUSBaspHIDDevice);
 begin
-  USBaspHIDDevice := AUSBaspHIDDevice;
-  USBaspHIDDevice^.HidDevice := THidDevice.OpenPath(AUSBaspHIDDevice^.Path);
-  //USBaspHIDDevice^.HidDevice^.SetNonBlocking(1);
+  AUSBaspHIDDevice^.HidDevice := THidDevice.OpenPath(AUSBaspHIDDevice^.Path);
 end;
 
-procedure usbasp_close;
+procedure usbasp_close(const AUSBaspHIDDevice: PUSBaspHIDDevice);
 begin
-  USBaspHIDDevice^.HidDevice^.Close;
-  USBaspHIDDevice := nil;
+  AUSBaspHIDDevice^.HidDevice^.Close;
 end;
 
-function usbasp_read(var Data): integer;
+function usbasp_read(const AUSBaspHIDDevice: PUSBaspHIDDevice; var Data): integer;
 var
   HidBuffer: array[0..8] of byte = (0, 0, 0, 0, 0, 0, 0, 0, 0);
 begin
   // Read default 0 Report ID
-  Result := USBaspHIDDevice^.HidDevice^.ReadTimeout(HidBuffer, USBaspHIDDevice^.ReportSize, 250);
-  Move(HidBuffer, Data, USBaspHIDDevice^.ReportSize);
+  Result := AUSBaspHIDDevice^.HidDevice^.ReadTimeout(HidBuffer, AUSBaspHIDDevice^.ReportSize, 250);
+  Move(HidBuffer, Data, AUSBaspHIDDevice^.ReportSize);
 end;
 
-function usbasp_write(var Data): integer;
+function usbasp_write(const AUSBaspHIDDevice: PUSBaspHIDDevice; var Data): integer;
 var
   HidBuffer: array[0..8] of byte = (0, 0, 0, 0, 0, 0, 0, 0, 0);
 begin
   // Add Report ID
   HidBuffer[0] := $00;
-  Move(Data, HidBuffer[1], USBaspHIDDevice^.ReportSize + 1);
+  Move(Data, HidBuffer[1], AUSBaspHIDDevice^.ReportSize + 1);
 
   // Report size plus added Report ID
-  Result := USBaspHIDDevice^.HidDevice^.Write(HidBuffer, USBaspHIDDevice^.ReportSize + 1) - 1;
+  Result := AUSBaspHIDDevice^.HidDevice^.Write(HidBuffer, AUSBaspHIDDevice^.ReportSize + 1) - 1;
 end;
 
-function usbasp_uart_get_conf(var Data): integer;
+function usbasp_uart_get_conf(const AUSBaspHIDDevice: PUSBaspHIDDevice; var Data): integer;
 var
   HidBuffer: array[0..8] of byte = (0, 0, 0, 0, 0, 0, 0, 0, 0);
   HidSize: SizeInt;
@@ -189,24 +185,24 @@ begin
   HidBuffer[0] := $00;
 
   // Report size plus added Report ID
-  HidSize := USBaspHIDDevice^.HidDevice^.GetFeatureReport(HidBuffer, USBaspHIDDevice^.ReportSize + 1) - 1;
+  HidSize := AUSBaspHIDDevice^.HidDevice^.GetFeatureReport(HidBuffer, AUSBaspHIDDevice^.ReportSize + 1) - 1;
 
   Move(HidBuffer[1], Data, HidSize);
 
   Result := HidSize - 1;
 end;
 
-function usbasp_uart_set_conf(var Data): integer;
+function usbasp_uart_set_conf(const AUSBaspHIDDevice: PUSBaspHIDDevice; var Data): integer;
 var
   HidBuffer: array[0..8] of byte = (0, 0, 0, 0, 0, 0, 0, 0, 0);
   HidSize: SizeInt;
 begin
   // Add Report ID
   HidBuffer[0] := $00;
-  Move(Data, HidBuffer[1], USBaspHIDDevice^.ReportSize + 1);
+  Move(Data, HidBuffer[1], AUSBaspHIDDevice^.ReportSize + 1);
 
   // Report size plus added Report ID
-  HidSize := USBaspHIDDevice^.HidDevice^.SendFeatureReport(HidBuffer, USBaspHIDDevice^.ReportSize + 1);
+  HidSize := AUSBaspHIDDevice^.HidDevice^.SendFeatureReport(HidBuffer, AUSBaspHIDDevice^.ReportSize + 1);
 
   Move(HidBuffer[1], Data, HidSize - 1);
 

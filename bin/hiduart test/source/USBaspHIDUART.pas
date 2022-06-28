@@ -123,13 +123,13 @@ type
       else
         exit;
 
-      usbasp_uart_get_conf(HidPacketRead);
+      usbasp_uart_get_conf(USBaspHIDList[index], HidPacketRead);
 
       HidPacketRead[0] := 0;
       HidPacketRead[1] := 0;
-      usbasp_uart_set_conf(HidPacketRead);
+      usbasp_uart_set_conf(USBaspHIDList[index], HidPacketRead);
 
-      usbasp_uart_get_conf(HidPacketRead);
+      usbasp_uart_get_conf(USBaspHIDList[index], HidPacketRead);
       if (not HasOption('c', 'crystal')) then
       begin
         case HidPacketRead[5] of
@@ -146,7 +146,7 @@ type
       HidPacketRead[2] := 24;
       HidPacketRead[3] := 0;
 
-      usbasp_uart_set_conf(HidPacketRead);
+      usbasp_uart_set_conf(USBaspHIDList[index], HidPacketRead);
 
       WriteLn();
       WriteLn('USBasp device configuration');
@@ -155,8 +155,8 @@ type
       WriteLn('Baud    : ', baud);
       WriteLn();
 
-      ReceiveRingBuffer := TRingBuffer.Create(4096);
-      ReceiveThread := TThreadRead.Create(ReceiveRingBuffer);
+      ReceiveRingBuffer := TRingBuffer.Create(8192);
+      ReceiveThread := TThreadRead.Create(USBaspHIDList[index], ReceiveRingBuffer);
       try
         BreakLoop := false;
         while not BreakLoop do
@@ -169,7 +169,7 @@ type
               Write(char(rbyte));
           end
           else
-            Sleep(5);
+            Sleep(1);
           if KeyPressed then
           begin
             if ReadKey = #3 then
@@ -179,7 +179,7 @@ type
 
         HidPacketRead[0] := 0;
         HidPacketRead[1] := 0;
-        usbasp_uart_set_conf(HidPacketRead);
+        usbasp_uart_set_conf(USBaspHIDList[index], HidPacketRead);
 
       finally
         ReceiveThread.Terminate;
@@ -189,7 +189,7 @@ type
         ReceiveRingBuffer.Free;
       end;
 
-      usbasp_close();
+      usbasp_close(USBaspHIDList[index]);
 
       Terminate;
       Exit;
@@ -204,13 +204,13 @@ type
 
         usbasp_open(USBaspHIDList[index]);
 
-        usbasp_uart_get_conf(HidPacketRead);
+        usbasp_uart_get_conf(USBaspHIDList[index], HidPacketRead);
 
         HidPacketRead[0] := 0;
         HidPacketRead[1] := 0;
-        usbasp_uart_set_conf(HidPacketRead);
+        usbasp_uart_set_conf(USBaspHIDList[index], HidPacketRead);
 
-        usbasp_uart_get_conf(HidPacketRead);
+        usbasp_uart_get_conf(USBaspHIDList[index], HidPacketRead);
         if (not HasOption('c', 'crystal')) then
         begin
           case HidPacketRead[5] of
@@ -226,7 +226,7 @@ type
         HidPacketRead[2] := 24;
         HidPacketRead[3] := 0;
 
-        usbasp_uart_set_conf(HidPacketRead);
+        usbasp_uart_set_conf(USBaspHIDList[index], HidPacketRead);
 
         WriteLn();
         WriteLn('USBasp device configuration');
@@ -236,8 +236,8 @@ type
         WriteLn();
 
 
-        SendRingBuffer := TRingBuffer.Create(4096);
-        SendThread := TThreadWrite.Create(SendRingBuffer);
+        SendRingBuffer := TRingBuffer.Create(8192);
+        SendThread := TThreadWrite.Create(USBaspHIDList[index], SendRingBuffer);
         try
           tmp := '';
           repeat
@@ -277,7 +277,7 @@ type
 
           HidPacketRead[0] := 0;
           HidPacketRead[1] := 0;
-          usbasp_uart_set_conf(HidPacketRead);
+          usbasp_uart_set_conf(USBaspHIDList[index], HidPacketRead);
 
         finally
           SendThread.Terminate;
@@ -287,7 +287,7 @@ type
           SendRingBuffer.Free;
         end;
 
-        usbasp_close();
+        usbasp_close(USBaspHIDList[index]);
       end;
 
       Terminate;
