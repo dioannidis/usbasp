@@ -41,15 +41,18 @@ type
   TRingBuffer = class(TObject)
   private
     FMemory: Pointer;
-    FSize, FReadIndex, FWriteIndex, FCount: integer;
+    FSize,
+    FReadIndex,
+    FWriteIndex,
+    FCount: integer;
     function GetIsEmpty: boolean;
     function GetIsFull: boolean;
   public
     constructor Create(const ASize: integer);
     destructor Destroy; override;
-    procedure Read(out AData; const ACount: integer);
-    procedure Write(var AData; const ACount: integer);
-    function ReadByte: byte;
+    procedure Read(out AData; const ACount: integer; const APeakAhead: Boolean = false);
+    function Write(var AData; const ACount: integer): Integer;
+    procedure AdvanceReadIndex(const ACount: Integer);
   published
     property Count: integer read FCount;
     property Size: integer read FSize;
@@ -88,7 +91,7 @@ uses
 
 function TRingBuffer.GetIsEmpty: boolean; inline;
 begin
-  Result :=  FCount = 0;
+  Result := FCount = 0;
 end;
 
 function TRingBuffer.GetIsFull: boolean; inline;
@@ -112,42 +115,48 @@ begin
   inherited Destroy;
 end;
 
-procedure TRingBuffer.Read(out AData; const ACount: integer);
+procedure TRingBuffer.Read(out AData; const ACount: integer; const APeakAhead: Boolean = false);
 var
-  locCount: Integer;
+  locCount, locReadIndex: Integer;
   PData: PByte;
-
 begin
   if IsEmPty or (ACount = 0) then
     Exit;
 
   PData := @AData;
   locCount := ACount;
+  locReadIndex := FReadIndex;
 
   if locCount > FCount then
     locCount := FCount;
 
-  if (locCount + FReadIndex) > FSize then
+  if (locCount + locReadIndex) > FSize then
   begin
-    Move((FMemory + FReadIndex)^, PData^, FSize - FReadIndex);
-    Inc(PData, FSize - FReadIndex);
-    Move(FMemory^, PData^, locCount - (FSize - FReadIndex));
-    FReadIndex := locCount - (FSize - FReadIndex);
+    Move((FMemory + locReadIndex)^, PData^, FSize - locReadIndex);
+    Inc(PData, FSize - locReadIndex);
+    Move(FMemory^, PData^, locCount - (FSize - locReadIndex));
+    locReadIndex := locCount - (FSize - locReadIndex);
   end
   else
   begin
     Move((FMemory + FReadIndex)^, PData^, locCount);
-    FReadIndex := FReadIndex + locCount;
+    locReadIndex := locReadIndex + locCount;
   end;
 
-  InterlockedExchangeAdd(FCount, -locCount);
+  if not APeakAhead then
+  begin
+    FReadIndex := locReadIndex;
+    InterlockedExchangeAdd(FCount, -locCount);
+  end;
 end;
 
-procedure TRingBuffer.Write(var AData; const ACount: integer);
+function TRingBuffer.Write(var AData; const ACount: integer): Integer;
 var
   locCount: Integer;
   PData: Pointer;
 begin
+  Result := 0;
+
   if IsFull or (ACount = 0) then
     Exit;
 
@@ -171,28 +180,46 @@ begin
   end;
 
   InterlockedExchangeAdd(FCount, locCount);
+
+  Result := locCount;
 end;
 
-function TRingBuffer.ReadByte: byte;
+procedure TRingBuffer.AdvanceReadIndex(const ACount: Integer);
+var
+  locReadIndex: Integer;
 begin
-  Read(Result, 1);
+  if ACount = 0 then
+    exit;
+
+  locReadIndex := FReadIndex;
+
+  if (ACount + locReadIndex) > FSize then
+    locReadIndex := ACount - (FSize - locReadIndex)
+  else
+    locReadIndex := locReadIndex + ACount;
+
+  FReadIndex := locReadIndex;
+
+  InterlockedExchangeAdd(FCount, -ACount);
 end;
 
 { TThreadRead }
 
 procedure TThreadRead.Execute;
 var
-  USBAspHidPacket: array[0..7] of byte;
+  USBAspHidPacket: array[0..7] of byte = (0, 0, 0, 0, 0, 0, 0, 0);
 begin
   repeat
-    if usbasp_read(USBAspHidPacket) <> 0 then
+    if usbasp_read(USBAspHidPacket) > 0 then
     begin
       if (USBAspHidPacket[7] > 0) then
+      begin
         if (USBAspHidPacket[7] > 7) then
           FBuffer.Write(USBAspHidPacket, 8)
         else
           FBuffer.Write(USBAspHidPacket, USBAspHidPacket[7]);
-    end;
+      end;
+    end
   until Terminated;
 end;
 
@@ -207,11 +234,34 @@ end;
 procedure TThreadWrite.Execute;
 var
   USBAspHidPacket: array[0..7] of byte;
+  locCount, SendPacket, AdvanceAmount: Integer;
 begin
   repeat
+    SendPacket := 0;
+    AdvanceAmount := 0;
     if not FBuffer.IsEmpty then
     begin
-{ TODO : Implement packeting }
+      locCount := FBuffer.Count;
+      if locCount > 7 then
+      begin
+        FBuffer.Read(USBAspHidPacket, 8, true);
+        if USBAspHidPacket[7] < 7 then
+        begin
+          USBAspHidPacket[7] := 7;
+          AdvanceAmount := 7;
+        end
+        else
+          AdvanceAmount := 8;
+      end
+      else
+      begin
+        FBuffer.Read(USBAspHidPacket, locCount);
+        USBAspHidPacket[7] := locCount;
+      end;
+      SendPacket := usbasp_write(USBAspHidPacket);
+      if SendPacket > 0 then
+        if SendPacket = 8 then
+          FBuffer.AdvanceReadIndex(AdvanceAmount)
     end;
   until Terminated;
 end;
