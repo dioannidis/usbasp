@@ -53,20 +53,21 @@ type
   procedure TUSBaspHIDUARTTest.DoRun;
   var
     ErrorMsg: string;
-    HidPacketRead: array[0..7] of byte;
+    HidPacketRead: array[0..7] of byte = (0, 0, 0, 0, 0, 0, 0, 0);
     SerialData: array of byte;
-    x, RcvByte, pos, size: integer;
+    x: integer;
     prescaler: word;
     rbyte: byte;
-    //FileIn: TFileStream;
-    SendBuf: boolean;
+    BreakLoop: boolean;
     baud: integer = 9600;
     index: byte = 0;
     crystal: integer = 12000000;
     tmp: string;
     tmpChar: char;
-    ReadThread: TThreadRead;
-    ReadRingBuffer: TRingBuffer;
+    ReceiveThread: TThreadRead;
+    ReceiveRingBuffer: TRingBuffer;
+    SendThread: TThreadWrite;
+    SendRingBuffer: TRingBuffer;
 
   begin
     // quick check parameters
@@ -154,37 +155,39 @@ type
       WriteLn('Baud    : ', baud);
       WriteLn();
 
-      ReadRingBuffer := TRingBuffer.Create(4096);
-      ReadThread := TThreadRead.Create(ReadRingBuffer);
+      ReceiveRingBuffer := TRingBuffer.Create(4096);
+      ReceiveThread := TThreadRead.Create(ReceiveRingBuffer);
       try
-        while True do
+        BreakLoop := false;
+        while not BreakLoop do
         begin
-          if not ReadRingBuffer.IsEmpty then
+          if not ReceiveRingBuffer.IsEmpty then
           begin
-            SetLength(SerialData, ReadRingBuffer.Count);
-            ReadRingBuffer.Read(SerialData[0], Length(SerialData));
+            SetLength(SerialData, ReceiveRingBuffer.Count);
+            ReceiveRingBuffer.Read(SerialData[0], Length(SerialData));
             for rbyte in SerialData do
               Write(char(rbyte));
-          end;
+          end
+          else
+            Sleep(5);
           if KeyPressed then
           begin
-            if (ReadKey = #3) or (ReadKey = #27) then
-              Break;
+            if ReadKey = #3 then
+              BreakLoop := true;
           end;
-          Sleep(1);
         end;
+
+        HidPacketRead[0] := 0;
+        HidPacketRead[1] := 0;
+        usbasp_uart_set_conf(HidPacketRead);
+
       finally
-        ReadThread.Terminate;
-        ReadThread.WaitFor;
-        ReadThread.Free;
+        ReceiveThread.Terminate;
+        ReceiveThread.WaitFor;
+        ReceiveThread.Free;
 
-        ReadRingBuffer.Free;
+        ReceiveRingBuffer.Free;
       end;
-
-
-      HidPacketRead[0] := 0;
-      HidPacketRead[1] := 0;
-      usbasp_uart_set_conf(HidPacketRead);
 
       usbasp_close();
 
@@ -232,68 +235,57 @@ type
         WriteLn('Baud    : ', baud);
         WriteLn();
 
-        while True do
-        begin
-          x := 1;
-          SendBuf := False;
 
+        SendRingBuffer := TRingBuffer.Create(4096);
+        SendThread := TThreadWrite.Create(SendRingBuffer);
+        try
           tmp := '';
           repeat
             if KeyPressed then
             begin
               tmpChar := ReadKey;
-              if (tmpChar <> #3) and (tmpChar <> #13) and (tmpChar <> #27) then
+              if (tmpChar <> #3) then
               begin
                 Write(tmpChar);
-                tmp := tmp + tmpChar;
+                if tmpChar = #13 then
+                  WriteLn
+                else
+                  tmp := tmp + tmpChar;
               end;
-            end;
-          until (tmpChar = #13) or (tmpChar = #3) or (tmpChar <> #27);
-
-          if (tmpChar = #3) or (tmpChar = #27) then
-            break
-          else
-          begin
-            tmpChar := #0;
-            writeln();
-          end;
-
-          pos := 0;
-          while pos < tmp.Length do
-          begin
-            HidPacketRead[x - 1] := Ord(tmp[pos + 1]);
-            Inc(pos);
-            if (x < 8) and (pos = tmp.length) then
-            begin
-              HidPacketRead[7] := x;
-              SendBuf := True;
             end
             else
+              Sleep(5);
+            if not SendRingBuffer.IsFull and (tmpChar = #13) then
             begin
-              if (x = 8) then
+              if tmp.Length <= SendRingBuffer.Size then
               begin
-                if HidPacketRead[7] < 7 then
+                x := SendRingBuffer.Write(tmp[1], tmp.Length);
+                tmp := tmp.Remove(0, x);
+                if tmp.length = 0 then
                 begin
-                  pos := pos - 1;
-                  HidPacketRead[7] := 7;
+                  tmp := '';
+                  tmpChar := #0;
                 end;
-                x := 1;
-                SendBuf := True;
               end
               else
-                Inc(x);
+              begin
+                x := SendRingBuffer.Write(tmp[1], SendRingBuffer.Size);
+                tmp := tmp.Remove(0, x);
+              end;
             end;
-            if SendBuf then
-            begin
-              usbasp_write(HidPacketRead);
-              SendBuf := False;
-            end;
-          end;
-        end;
+          until tmpChar = #3;
 
-        HidPacketRead[0] := 0;
-        HidPacketRead[1] := 0;
-        usbasp_uart_set_conf(HidPacketRead);
+          HidPacketRead[0] := 0;
+          HidPacketRead[1] := 0;
+          usbasp_uart_set_conf(HidPacketRead);
+
+        finally
+          SendThread.Terminate;
+          SendThread.WaitFor;
+          SendThread.Free;
+
+          SendRingBuffer.Free;
+        end;
 
         usbasp_close();
       end;
@@ -303,6 +295,7 @@ type
     end;
 
     WriteHelp;
+
     // stop program loop
     Terminate;
   end;
