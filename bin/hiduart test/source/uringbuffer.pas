@@ -100,7 +100,7 @@ begin
 {$PUSH}
 {$Q-}
 {$R-}
-  Result := MaskIndex(FWriteIndex - FReadIndex);
+  Result := MaskIndex(WriteIndex - ReadIndex);
 {$POP}
 end;
 
