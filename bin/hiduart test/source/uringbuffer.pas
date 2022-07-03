@@ -48,8 +48,8 @@ type
     destructor Destroy; override;
     function ReadByte: byte;
     procedure WriteByte(const AValue: byte);
-    function Read(out ABuffer; const ALength: PtrInt): PtrInt;
-    function Write(var ABuffer; const ALength: PtrInt): PtrInt;
+    function Read(out ABuffer; const ALength: PtrUInt): PtrUInt;
+    function Write(var ABuffer; const ALength: PtrUInt): PtrUInt;
     function PeekByte: byte;
     property Empty: boolean read GetEmpty;
     property Full: boolean read GetFull;
@@ -116,7 +116,7 @@ begin
 {$POP}
 end;
 
-function TRingBuffer.Read(out ABuffer; const ALength: PtrInt): PtrInt;
+function TRingBuffer.Read(out ABuffer; const ALength: PtrUInt): PtrUInt;
 begin
   Result := 0;
   while (not GetEmpty) and (Result <= ALength) do
@@ -126,7 +126,7 @@ begin
   end;
 end;
 
-function TRingBuffer.Write(var ABuffer; const ALength: PtrInt): PtrInt;
+function TRingBuffer.Write(var ABuffer; const ALength: PtrUInt): PtrUInt;
 begin
   Result := 0;
   while (not GetFull) and (Result <= ALength) do
