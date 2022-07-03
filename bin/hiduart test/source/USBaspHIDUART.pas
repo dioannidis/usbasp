@@ -37,7 +37,8 @@ uses
   CustApp,
   crt,
   usbasp_hid,
-  usbasp_threads;
+  usbasp_threads,
+  uringbuffer;
 
 type
 
@@ -51,19 +52,21 @@ type
   end;
 
   procedure TUSBaspHIDUARTTest.DoRun;
+  const
+    ReceiveBufferSize = 8192;
+    SendBufferSize    = 8192;
   var
     ErrorMsg: string;
-    HidPacketRead: array[0..7] of byte = (0, 0, 0, 0, 0, 0, 0, 0);
+    HidPacketBuffer: array[0..7] of byte = (0, 0, 0, 0, 0, 0, 0, 0);
     SerialData: array of byte;
-    x: integer;
+    x, RcvBytes, SndBytes: integer;
     prescaler: word;
-    rbyte: byte;
     BreakLoop: boolean;
     baud: integer = 9600;
-    index: byte = 0;
+    USBaspIndex: byte = 0;
     crystal: integer = 12000000;
-    tmp: string;
-    tmpChar: char;
+    InputString: string;
+    InputChar: char;
     ReceiveThread: TThreadRead;
     ReceiveRingBuffer: TRingBuffer;
     SendThread: TThreadWrite;
@@ -103,7 +106,7 @@ type
 
     if HasOption('i', 'index') then
     begin
-      index := StrToInt(GetOptionValue('i', 'index'));
+      USBaspIndex := StrToInt(GetOptionValue('i', 'index'));
     end;
 
     if HasOption('b', 'baud') then
@@ -118,21 +121,21 @@ type
       if (USBaspHIDList.Count = 0) then
         exit;
 
-      if USBaspHIDList[index].HidDevice <> nil then
-        usbasp_open(USBaspHIDList[index])
+      if USBaspHIDList[USBaspIndex].HidDevice <> nil then
+        usbasp_open(USBaspHIDList[USBaspIndex])
       else
         exit;
 
-      usbasp_uart_get_conf(USBaspHIDList[index], HidPacketRead);
+      usbasp_uart_get_conf(USBaspHIDList[USBaspIndex], HidPacketBuffer);
 
-      HidPacketRead[0] := 0;
-      HidPacketRead[1] := 0;
-      usbasp_uart_set_conf(USBaspHIDList[index], HidPacketRead);
+      HidPacketBuffer[0] := 0;
+      HidPacketBuffer[1] := 0;
+      usbasp_uart_set_conf(USBaspHIDList[USBaspIndex], HidPacketBuffer);
 
-      usbasp_uart_get_conf(USBaspHIDList[index], HidPacketRead);
+      usbasp_uart_get_conf(USBaspHIDList[USBaspIndex], HidPacketBuffer);
       if (not HasOption('c', 'crystal')) then
       begin
-        case HidPacketRead[5] of
+        case HidPacketBuffer[5] of
           1: crystal := 16000000;
           2: crystal := 18000000;
           3: crystal := 20000000;
@@ -141,12 +144,12 @@ type
 
       prescaler := crystal div 8 div baud - 1;
 
-      HidPacketRead[0] := lo(prescaler);
-      HidPacketRead[1] := hi(prescaler);
-      HidPacketRead[2] := 24;
-      HidPacketRead[3] := 0;
+      HidPacketBuffer[0] := lo(prescaler);
+      HidPacketBuffer[1] := hi(prescaler);
+      HidPacketBuffer[2] := 24;
+      HidPacketBuffer[3] := 0;
 
-      usbasp_uart_set_conf(USBaspHIDList[index], HidPacketRead);
+      usbasp_uart_set_conf(USBaspHIDList[USBaspIndex], HidPacketBuffer);
 
       WriteLn();
       WriteLn('USBasp device configuration');
@@ -155,31 +158,30 @@ type
       WriteLn('Baud    : ', baud);
       WriteLn();
 
-      ReceiveRingBuffer := TRingBuffer.Create(8192);
-      ReceiveThread := TThreadRead.Create(USBaspHIDList[index], ReceiveRingBuffer);
+      ReceiveRingBuffer := TRingBuffer.Create(ReceiveBufferSize);
+      ReceiveThread := TThreadRead.Create(USBaspHIDList[USBaspIndex], ReceiveRingBuffer);
       try
         BreakLoop := false;
+        SetLength(SerialData, 1024);
         while not BreakLoop do
         begin
-          if not ReceiveRingBuffer.IsEmpty then
+          if not ReceiveRingBuffer.Empty then
           begin
-            SetLength(SerialData, ReceiveRingBuffer.Count);
-            ReceiveRingBuffer.Read(SerialData[0], Length(SerialData));
-            for rbyte in SerialData do
-              Write(char(rbyte));
-          end
-          else
-            Sleep(1);
+            RcvBytes := ReceiveRingBuffer.Read(SerialData[0], Length(SerialData));
+            for x := 0 to RcvBytes - 1 do
+              Write(char(SerialData[x]));
+          end;
           if KeyPressed then
           begin
             if ReadKey = #3 then
               BreakLoop := true;
           end;
+          Sleep(2);
         end;
 
-        HidPacketRead[0] := 0;
-        HidPacketRead[1] := 0;
-        usbasp_uart_set_conf(USBaspHIDList[index], HidPacketRead);
+        HidPacketBuffer[0] := 0;
+        HidPacketBuffer[1] := 0;
+        usbasp_uart_set_conf(USBaspHIDList[USBaspIndex], HidPacketBuffer);
 
       finally
         ReceiveThread.Terminate;
@@ -189,7 +191,7 @@ type
         ReceiveRingBuffer.Free;
       end;
 
-      usbasp_close(USBaspHIDList[index]);
+      usbasp_close(USBaspHIDList[USBaspIndex]);
 
       Terminate;
       Exit;
@@ -202,18 +204,18 @@ type
       if (USBaspHIDList.Count > 0) then
       begin
 
-        usbasp_open(USBaspHIDList[index]);
+        usbasp_open(USBaspHIDList[USBaspIndex]);
 
-        usbasp_uart_get_conf(USBaspHIDList[index], HidPacketRead);
+        usbasp_uart_get_conf(USBaspHIDList[USBaspIndex], HidPacketBuffer);
 
-        HidPacketRead[0] := 0;
-        HidPacketRead[1] := 0;
-        usbasp_uart_set_conf(USBaspHIDList[index], HidPacketRead);
+        HidPacketBuffer[0] := 0;
+        HidPacketBuffer[1] := 0;
+        usbasp_uart_set_conf(USBaspHIDList[USBaspIndex], HidPacketBuffer);
 
-        usbasp_uart_get_conf(USBaspHIDList[index], HidPacketRead);
+        usbasp_uart_get_conf(USBaspHIDList[USBaspIndex], HidPacketBuffer);
         if (not HasOption('c', 'crystal')) then
         begin
-          case HidPacketRead[5] of
+          case HidPacketBuffer[5] of
             1: crystal := 16000000;
             2: crystal := 18000000;
             3: crystal := 20000000;
@@ -221,12 +223,12 @@ type
         end;
         prescaler := crystal div 8 div baud - 1;
 
-        HidPacketRead[0] := lo(prescaler);
-        HidPacketRead[1] := hi(prescaler);
-        HidPacketRead[2] := 24;
-        HidPacketRead[3] := 0;
+        HidPacketBuffer[0] := lo(prescaler);
+        HidPacketBuffer[1] := hi(prescaler);
+        HidPacketBuffer[2] := 24;
+        HidPacketBuffer[3] := 0;
 
-        usbasp_uart_set_conf(USBaspHIDList[index], HidPacketRead);
+        usbasp_uart_set_conf(USBaspHIDList[USBaspIndex], HidPacketBuffer);
 
         WriteLn();
         WriteLn('USBasp device configuration');
@@ -236,48 +238,40 @@ type
         WriteLn();
 
 
-        SendRingBuffer := TRingBuffer.Create(8192);
-        SendThread := TThreadWrite.Create(USBaspHIDList[index], SendRingBuffer);
+        SendRingBuffer := TRingBuffer.Create(SendBufferSize);
+        SendThread := TThreadWrite.Create(USBaspHIDList[USBaspIndex], SendRingBuffer);
         try
-          tmp := '';
+          InputString := '';
           repeat
             if KeyPressed then
             begin
-              tmpChar := ReadKey;
-              if (tmpChar <> #3) then
+              InputChar := ReadKey;
+              if (InputChar <> #3) then
               begin
-                Write(tmpChar);
-                if tmpChar = #13 then
+                Write(InputChar);
+                if InputChar = #13 then
                   WriteLn
                 else
-                  tmp := tmp + tmpChar;
-              end;
-            end
-            else
-              Sleep(5);
-            if not SendRingBuffer.IsFull and (tmpChar = #13) then
-            begin
-              if tmp.Length <= SendRingBuffer.Size then
-              begin
-                x := SendRingBuffer.Write(tmp[1], tmp.Length);
-                tmp := tmp.Remove(0, x);
-                if tmp.length = 0 then
-                begin
-                  tmp := '';
-                  tmpChar := #0;
-                end;
-              end
-              else
-              begin
-                x := SendRingBuffer.Write(tmp[1], SendRingBuffer.Size);
-                tmp := tmp.Remove(0, x);
+                  InputString := InputString + InputChar;
               end;
             end;
-          until tmpChar = #3;
+            if not SendRingBuffer.Full and (InputChar = #13) and (InputString.Length > 0) then
+            begin
+              SndBytes := SendRingBuffer.Write(InputString[1], InputString.Length);
+              InputString := InputString.Remove(0, SndBytes);
+              if InputString.Length = 0 then
+              begin
+                InputString := '';
+                InputChar := #0;
+              end;
+            end;
+            if InputString.Length = 0 then
+              Sleep(2);
+          until InputChar = #3;
 
-          HidPacketRead[0] := 0;
-          HidPacketRead[1] := 0;
-          usbasp_uart_set_conf(USBaspHIDList[index], HidPacketRead);
+          HidPacketBuffer[0] := 0;
+          HidPacketBuffer[1] := 0;
+          usbasp_uart_set_conf(USBaspHIDList[USBaspIndex], HidPacketBuffer);
 
         finally
           SendThread.Terminate;
@@ -287,7 +281,7 @@ type
           SendRingBuffer.Free;
         end;
 
-        usbasp_close(USBaspHIDList[index]);
+        usbasp_close(USBaspHIDList[USBaspIndex]);
       end;
 
       Terminate;
