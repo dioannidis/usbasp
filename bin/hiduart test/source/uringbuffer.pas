@@ -119,7 +119,7 @@ end;
 function TRingBuffer.Read(out ABuffer; const ALength: PtrUInt): PtrUInt;
 begin
   Result := 0;
-  while (not GetEmpty) and (Result <= ALength) do
+  while (not GetEmpty) and (Result < ALength) do
   begin
     pbyte(@ABuffer + Result)^ := ReadByte;
     Inc(Result);
@@ -129,7 +129,7 @@ end;
 function TRingBuffer.Write(var ABuffer; const ALength: PtrUInt): PtrUInt;
 begin
   Result := 0;
-  while (not GetFull) and (Result <= ALength) do
+  while (not GetFull) and (Result < ALength) do
   begin
     WriteByte(pbyte(@ABuffer + Result)^);
     Inc(Result);
