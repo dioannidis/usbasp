@@ -32,7 +32,7 @@ unit usbasp_threads;
 interface
 
 uses
-  Classes, SysUtils, syncobjs, usbasp_hid, uringbuffer;
+  Classes, SysUtils, usbasp_hid, uringbuffer;
 
 type
 
@@ -67,7 +67,6 @@ implementation
 procedure TThreadRead.Execute;
 var
   USBAspHidPacket: array[0..7] of byte = (0, 0, 0, 0, 0, 0, 0, 0);
-  writebytes: PtrInt;
 begin
   repeat
     if usbasp_read(FUSBaspDevice, USBAspHidPacket) > 0 then
