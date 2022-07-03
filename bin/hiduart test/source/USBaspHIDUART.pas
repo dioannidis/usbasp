@@ -170,13 +170,14 @@ type
             RcvBytes := ReceiveRingBuffer.Read(SerialData[0], Length(SerialData));
             for x := 0 to RcvBytes - 1 do
               Write(char(SerialData[x]));
-          end;
+          end
+          else
+            Sleep(2);
           if KeyPressed then
           begin
             if ReadKey = #3 then
               BreakLoop := true;
           end;
-          Sleep(2);
         end;
 
         HidPacketBuffer[0] := 0;
