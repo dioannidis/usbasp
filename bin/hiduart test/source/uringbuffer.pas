@@ -90,12 +90,18 @@ begin
   Result := AValue and (FMemorySize - 1);
 end;
 
+// See : https://forum.lazarus.freepascal.org/index.php/topic,59796.msg446453.html#msg446453
 function TRingBuffer.GetCapacity: PtrUInt; inline;
+var
+  WriteIndex, ReadIndex: PtrUInt;
 begin
-  if FReadIndex > FWriteIndex then
-    Result := FWriteIndex + (PtrUInt.MaxValue - FReadIndex)
-  else
-    Result := FWriteIndex - FReadIndex;
+  ReadIndex := FReadIndex;
+  WriteIndex := FWriteIndex;
+{$PUSH}
+{$Q-}
+{$R-}
+  Result := MaskIndex(FWriteIndex - FReadIndex);
+{$POP}
 end;
 
 function TRingBuffer.ReadByte: byte;
