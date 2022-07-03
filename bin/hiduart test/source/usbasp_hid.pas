@@ -142,7 +142,10 @@ begin
     //ReadLn();
   end
   else
+  begin
+    WriteLn();
     WriteLn('No USBasp HID UART found.');
+  end;
 end;
 
 procedure usbasp_open(const AUSBaspHIDDevice: PUSBaspHIDDevice);
