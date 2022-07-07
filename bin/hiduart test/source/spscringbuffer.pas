@@ -1,4 +1,4 @@
-unit uRingBuffer;
+unit SPSCRingBuffer;
 
 {
 
@@ -33,9 +33,9 @@ uses
 
 type
 
-  { TRingBuffer }
+  { TSPSCRingBuffer }
 
-  TRingBuffer = class(TObject)
+  TSPSCRingBuffer = class(TObject)
   private
     FMemoryData: Pointer;
     FMemorySize, FReadIndex, FWriteIndex: PtrUInt;
@@ -64,9 +64,9 @@ implementation
 uses
   Math;
 
-{ TRingBuffer }
+{ TSPSCRingBuffer }
 
-constructor TRingBuffer.Create(const ASize: PtrUInt);
+constructor TSPSCRingBuffer.Create(const ASize: PtrUInt);
 begin
   inherited Create;
   FReadIndex := 0;
@@ -75,34 +75,34 @@ begin
   Getmem(FMemoryData, FMemorySize);
 end;
 
-destructor TRingBuffer.Destroy;
+destructor TSPSCRingBuffer.Destroy;
 begin
   Freemem(FMemoryData, FMemorySize);
   inherited Destroy;
 end;
 
-function TRingBuffer.GetEmpty: boolean; //inline;
+function TSPSCRingBuffer.GetEmpty: boolean; //inline;
 begin
   Result := FReadIndex = FWriteIndex;
 end;
 
-function TRingBuffer.GetFull: boolean; //inline;
+function TSPSCRingBuffer.GetFull: boolean; //inline;
 begin
   Result := GetCapacity = FMemorySize;
 end;
 
-function TRingBuffer.MaskIndex(const AValue: PtrUInt): PtrUInt; //inline;
+function TSPSCRingBuffer.MaskIndex(const AValue: PtrUInt): PtrUInt; //inline;
 begin
   Result := AValue and (FMemorySize - 1);
 end;
 
 // See : https://forum.lazarus.freepascal.org/index.php/topic,59796.msg446453.html#msg446453
-function TRingBuffer.GetCapacity: PtrUInt;  //inline;
+function TSPSCRingBuffer.GetCapacity: PtrUInt;  //inline;
 var
   WriteIndex, ReadIndex: PtrUInt;
 begin
   ReadIndex := FReadIndex;
-  WriteIndex:= FWriteIndex;
+  WriteIndex := FWriteIndex;
 {$PUSH}
 {$Q-}
 {$R-}
@@ -113,7 +113,7 @@ begin
 {$POP}
 end;
 
-function TRingBuffer.ReadByte: byte; inline;
+function TSPSCRingBuffer.ReadByte: byte; inline;
 begin
   Result := pbyte(FMemoryData)[MaskIndex(FReadIndex)];
 {$PUSH}
@@ -122,22 +122,21 @@ begin
 {$POP}
 end;
 
-procedure TRingBuffer.WriteByte(const AValue: byte); inline;
+procedure TSPSCRingBuffer.WriteByte(const AValue: byte); inline;
 begin
-
-pbyte(FMemoryData)[MaskIndex(FWriteIndex)] := AValue;
+  pbyte(FMemoryData)[MaskIndex(FWriteIndex)] := AValue;
 {$PUSH}
 {$Q-}
   Inc(FWriteIndex);
 {$POP}
 end;
 
-function TRingBuffer.PeekByte: byte;
+function TSPSCRingBuffer.PeekByte: byte;
 begin
   Result := pbyte(FMemoryData)[MaskIndex(FReadIndex)];
 end;
 
-function TRingBuffer.Read(const ABuffer; const ALength: PtrUInt): PtrUInt;
+function TSPSCRingBuffer.Read(const ABuffer; const ALength: PtrUInt): PtrUInt;
 begin
   Result := 0;
   while (not Empty) and (Result < ALength) do
@@ -147,7 +146,7 @@ begin
   end;
 end;
 
-function TRingBuffer.Write(const ABuffer; const ALength: PtrUInt): PtrUInt;
+function TSPSCRingBuffer.Write(const ABuffer; const ALength: PtrUInt): PtrUInt;
 begin
   Result := 0;
   while (not Full) and (Result < ALength) do
@@ -157,7 +156,7 @@ begin
   end;
 end;
 
-function TRingBuffer.Peek(var AValue: byte): PtrInt;
+function TSPSCRingBuffer.Peek(var AValue: byte): PtrInt;
 begin
   Result := -1;
   if not Empty then
@@ -167,7 +166,7 @@ begin
   end;
 end;
 
-procedure TRingBuffer.AdvanceReadIdx;
+procedure TSPSCRingBuffer.AdvanceReadIdx;
 begin
 {$PUSH}
 {$Q-}

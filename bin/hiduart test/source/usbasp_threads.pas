@@ -32,7 +32,7 @@ unit USBasp_Threads;
 interface
 
 uses
-  Classes, SysUtils, USBasp_HID, uRingBuffer;
+  Classes, SysUtils, USBasp_HID, SPSCRingBuffer;
 
 type
 
@@ -40,26 +40,26 @@ type
 
   TThreadUSBRead = class(TThread)
   private
-    FBuffer: TRingBuffer;
+    FBuffer: TSPSCRingBuffer;
     FUSBaspDevice: PUSBaspHIDDevice;
   protected
     procedure Execute; override;
   public
     constructor Create(const AUSBaspDevice: PUSBaspHIDDevice;
-      const ABuffer: TRingBuffer); reintroduce;
+      const ABuffer: TSPSCRingBuffer); reintroduce;
   end;
 
   { TWriteRead }
 
   TThreadUSBWrite = class(TThread)
   private
-    FBuffer: TRingBuffer;
+    FBuffer: TSPSCRingBuffer;
     FUSBaspDevice: PUSBaspHIDDevice;
   protected
     procedure Execute; override;
   public
     constructor Create(const AUSBaspDevice: PUSBaspHIDDevice;
-      const ABuffer: TRingBuffer); reintroduce;
+      const ABuffer: TSPSCRingBuffer); reintroduce;
   end;
 
 implementation
@@ -90,7 +90,7 @@ begin
 end;
 
 constructor TThreadUSBRead.Create(const AUSBaspDevice: PUSBaspHIDDevice;
-  const ABuffer: TRingBuffer);
+  const ABuffer: TSPSCRingBuffer);
 begin
   inherited Create(False);
   FBuffer := ABuffer;
@@ -128,7 +128,7 @@ begin
 end;
 
 constructor TThreadUSBWrite.Create(const AUSBaspDevice: PUSBaspHIDDevice;
-  const ABuffer: TRingBuffer);
+  const ABuffer: TSPSCRingBuffer);
 begin
   inherited Create(False);
   FBuffer := ABuffer;

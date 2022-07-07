@@ -38,7 +38,7 @@ uses
   crt,
   USBasp_HID,
   USBasp_Threads,
-  uRingBuffer;
+  SPSCRingBuffer;
 
 type
 
@@ -68,9 +68,9 @@ type
     InputString: string;
     InputChar: char;
     ReceiveThread: TThreadUSBRead;
-    ReceiveRingBuffer: TRingBuffer;
+    ReceiveRingBuffer: TSPSCRingBuffer;
     SendThread: TThreadUSBWrite;
-    SendRingBuffer: TRingBuffer;
+    SendRingBuffer: TSPSCRingBuffer;
 
   begin
     // quick check parameters
@@ -171,7 +171,7 @@ type
         WriteLn('Baud    : ', baud);
         WriteLn();
 
-        ReceiveRingBuffer := TRingBuffer.Create(ReceiveBufferSize);
+        ReceiveRingBuffer := TSPSCRingBuffer.Create(ReceiveBufferSize);
         ReceiveThread := TThreadUSBRead.Create(USBaspHIDList[USBaspIndex], ReceiveRingBuffer);
         try
           BreakLoop := false;
@@ -270,7 +270,7 @@ type
         WriteLn();
 
 
-        SendRingBuffer := TRingBuffer.Create(SendBufferSize);
+        SendRingBuffer := TSPSCRingBuffer.Create(SendBufferSize);
         SendThread := TThreadUSBWrite.Create(USBaspHIDList[USBaspIndex], SendRingBuffer);
         try
           InputString := '';
