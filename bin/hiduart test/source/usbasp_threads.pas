@@ -1,11 +1,11 @@
-unit usbasp_threads;
+unit USBasp_Threads;
 
 {
 
   This file is part of
     Nephelae USBasp HID UART.
 
-  Threads for HIDAPI Communications.
+  USB HID Read / Write threads.
 
   Copyright (C) 2022 Dimitrios Chr. Ioannidis.
     Nephelae - https://www.nephelae.eu
@@ -32,41 +32,44 @@ unit usbasp_threads;
 interface
 
 uses
-  Classes, SysUtils, usbasp_hid, uringbuffer;
+  Classes, SysUtils, USBasp_HID, uRingBuffer;
 
 type
 
-  { TThreadRead }
+  { TThreadUSBRead }
 
-  TThreadRead = class(TThread)
+  TThreadUSBRead = class(TThread)
   private
     FBuffer: TRingBuffer;
     FUSBaspDevice: PUSBaspHIDDevice;
   protected
     procedure Execute; override;
   public
-    constructor Create(const AUSBaspDevice: PUSBaspHIDDevice; const ABuffer: TRingBuffer); reintroduce;
+    constructor Create(const AUSBaspDevice: PUSBaspHIDDevice;
+      const ABuffer: TRingBuffer); reintroduce;
   end;
 
   { TWriteRead }
 
-  TThreadWrite = class(TThread)
+  TThreadUSBWrite = class(TThread)
   private
     FBuffer: TRingBuffer;
     FUSBaspDevice: PUSBaspHIDDevice;
   protected
     procedure Execute; override;
   public
-    constructor Create(const AUSBaspDevice: PUSBaspHIDDevice; const ABuffer: TRingBuffer); reintroduce;
+    constructor Create(const AUSBaspDevice: PUSBaspHIDDevice;
+      const ABuffer: TRingBuffer); reintroduce;
   end;
 
 implementation
 
-{ TThreadRead }
+{ TThreadUSBRead }
 
-procedure TThreadRead.Execute;
+procedure TThreadUSBRead.Execute;
 var
   USBAspHidPacket: array[0..7] of byte = (0, 0, 0, 0, 0, 0, 0, 0);
+  SerialDataCount: byte;
 begin
   repeat
     if usbasp_read(FUSBaspDevice, USBAspHidPacket) > 0 then
@@ -74,43 +77,58 @@ begin
       if (USBAspHidPacket[7] > 0) then
       begin
         if (USBAspHidPacket[7] > 7) then
-          FBuffer.Write(USBAspHidPacket, 8)
+          SerialDataCount := 8
         else
-          FBuffer.Write(USBAspHidPacket, USBAspHidPacket[7]);
+          SerialDataCount := USBAspHidPacket[7];
+        if FBuffer.Write(USBAspHidPacket, SerialDataCount) <> SerialDataCount then
+          raise TExceptionClass.Create('Buffer OverRun ');
       end;
     end
+    else
+      Sleep(2);
   until Terminated;
 end;
 
-constructor TThreadRead.Create(const AUSBaspDevice: PUSBaspHIDDevice; const ABuffer: TRingBuffer);
+constructor TThreadUSBRead.Create(const AUSBaspDevice: PUSBaspHIDDevice;
+  const ABuffer: TRingBuffer);
 begin
   inherited Create(False);
   FBuffer := ABuffer;
-  FUSBaspDevice:= AUSBaspDevice;
+  FUSBaspDevice := AUSBaspDevice;
 end;
 
-{ TThreadWrite }
+{ TThreadUSBWrite }
 
-procedure TThreadWrite.Execute;
+procedure TThreadUSBWrite.Execute;
 var
   USBAspHidPacket: array[0..7] of byte = (0, 0, 0, 0, 0, 0, 0, 0);
-  ReadBytes: PtrInt;
+  NextByte: byte = 0;
 begin
   repeat
-    if not FBuffer.Empty then
+    USBAspHidPacket[7] := FBuffer.Read(USBAspHidPacket, 7);
+    if USBAspHidPacket[7] > 0 then
     begin
-      ReadBytes := FBuffer.Read(USBAspHidPacket, 7);
-      if (ReadBytes = 7) and (FBuffer.PeekByte > 7) then
-        USBAspHidPacket[7] := FBuffer.ReadByte
-      else
-        USBAspHidPacket[7] := ReadBytes;
+      if (USBAspHidPacket[7] = 7) then
+      begin
+        if FBuffer.Peek(NextByte) = 0 then
+        begin
+          if NextByte > 7 then
+          begin
+            USBAspHidPacket[7] := NextByte;
+            FBuffer.AdvanceReadIdx;
+          end;
+        end;
+      end;
       repeat
       until (usbasp_write(FUSBaspDevice, USBAspHidPacket) = 8) or Terminated;
-    end;
+    end
+    else
+      Sleep(2);
   until Terminated;
 end;
 
-constructor TThreadWrite.Create(const AUSBaspDevice: PUSBaspHIDDevice; const ABuffer: TRingBuffer);
+constructor TThreadUSBWrite.Create(const AUSBaspDevice: PUSBaspHIDDevice;
+  const ABuffer: TRingBuffer);
 begin
   inherited Create(False);
   FBuffer := ABuffer;

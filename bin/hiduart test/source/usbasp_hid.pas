@@ -1,4 +1,4 @@
-unit usbasp_hid;
+unit USBasp_HID;
 
 {
 

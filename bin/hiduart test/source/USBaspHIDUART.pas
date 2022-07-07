@@ -36,9 +36,9 @@ uses
   SysUtils,
   CustApp,
   crt,
-  usbasp_hid,
-  usbasp_threads,
-  uringbuffer;
+  USBasp_HID,
+  USBasp_Threads,
+  uRingBuffer;
 
 type
 
@@ -61,15 +61,15 @@ type
     SerialData: array of byte;
     x, RcvBytes, SndBytes: integer;
     prescaler: word;
-    BreakLoop: boolean;
+    BreakLoop, Sending: boolean;
     baud: integer = 9600;
     USBaspIndex: byte = 0;
     crystal: integer = 12000000;
     InputString: string;
     InputChar: char;
-    ReceiveThread: TThreadRead;
+    ReceiveThread: TThreadUSBRead;
     ReceiveRingBuffer: TRingBuffer;
-    SendThread: TThreadWrite;
+    SendThread: TThreadUSBWrite;
     SendRingBuffer: TRingBuffer;
 
   begin
@@ -172,15 +172,15 @@ type
         WriteLn();
 
         ReceiveRingBuffer := TRingBuffer.Create(ReceiveBufferSize);
-        ReceiveThread := TThreadRead.Create(USBaspHIDList[USBaspIndex], ReceiveRingBuffer);
+        ReceiveThread := TThreadUSBRead.Create(USBaspHIDList[USBaspIndex], ReceiveRingBuffer);
         try
           BreakLoop := false;
           SetLength(SerialData, 1024);
           while not BreakLoop do
           begin
-            if not ReceiveRingBuffer.Empty then
+            RcvBytes := ReceiveRingBuffer.Read(SerialData[0], Length(SerialData));
+            if RcvBytes > 0 then
             begin
-              RcvBytes := ReceiveRingBuffer.Read(SerialData[0], Length(SerialData));
               for x := 0 to RcvBytes - 1 do
                 Write(char(SerialData[x]));
             end
@@ -271,30 +271,37 @@ type
 
 
         SendRingBuffer := TRingBuffer.Create(SendBufferSize);
-        SendThread := TThreadWrite.Create(USBaspHIDList[USBaspIndex], SendRingBuffer);
+        SendThread := TThreadUSBWrite.Create(USBaspHIDList[USBaspIndex], SendRingBuffer);
         try
           InputString := '';
+          Sending := False;
           repeat
-            if KeyPressed then
+            if (not Sending) and KeyPressed then
             begin
               InputChar := ReadKey;
               if (InputChar <> #3) then
               begin
                 Write(InputChar);
                 if InputChar = #13 then
-                  WriteLn
+                begin
+                  WriteLn;
+                  Sending := True;
+                end
                 else
                   InputString := InputString + InputChar;
               end;
             end;
-            if not SendRingBuffer.Full and (InputChar = #13) and (InputString.Length > 0) then
+            if Sending then
             begin
-              SndBytes := SendRingBuffer.Write(InputString[1], InputString.Length);
-              InputString := InputString.Remove(0, SndBytes);
-              if InputString.Length = 0 then
+              if InputString.Length > 0 then
               begin
-                InputString := '';
-                InputChar := #0;
+                SndBytes := SendRingBuffer.Write(InputString[1], InputString.Length);
+                InputString := InputString.Remove(0, SndBytes);
+              end
+              else
+              begin
+                Sending := False;
+                InputChar:= #0;
               end;
             end;
             if InputString.Length = 0 then
