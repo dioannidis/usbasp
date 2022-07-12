@@ -47,75 +47,12 @@ static uchar prog_pagecounter;
 
     Based on the hard work by Marius Greuel @mariusgreuel ( https://github.com/mariusgreuel/USBasp ).
     This is a non intrusive version, using an unaltered V-USB with no changes in it's usbdrv code.
-
-    To avoid using driver installation (Zadig, libusb) on Windows and use by default
-    the winusb default driver for USBasp, we need to use OS feature descriptors. 
-    All USB 2.0 devices, when they are enumerated for the first time, Windows asks if 
-    there is an OS feature descriptor by sending a specific standard GET_DESCRIPTOR request
-    with the format :
-
-    --------------------------------------------------------------------------------------------------
-    |    bmRequestType   |   bRequest        |   wValue  |   wIndex  |   wLength |   Data            |
-    --------------------------------------------------------------------------------------------------
-    |    1000 0000B      |   GET_DESCRIPTOR  |   0x03EE  |   0x0000  |   0x12    |   Returned string |
-    --------------------------------------------------------------------------------------------------
-
-    It asks if there is a specific string descriptor at index 0xEE. Because this string 
-    descriptor request, is not by default handled by the V-USB, we change the USB_CFG_DESCR_PROPS_UNKNOWN
-    to be dynamic (USB_PROP_IS_DYNAMIC). This effectively tell the V-USB that for every 
-    unknown string index request to call the usbFunctionDescriptor function.
-
-    usbFunctionDescriptor function returns an OS string descriptor using the version 1.00 format 
-    which has a fixed length of 18 bytes, with a structure as shown in the following table :
-
-    --------------------------------------------------------------------------
-    |    Length  |   Type    |   Signature   |   MS Vendor Code  |   Pad     |
-    --------------------------------------------------------------------------
-    |    0x12    |   0x03    |   MSFT100     |   unsigned byte   |   0x00    |
-    --------------------------------------------------------------------------
-
-    Length: An unsigned byte and MUST be set to 0x12.
-
-    Type: An unsigned byte and MUST be set to 0x03.
-
-    Signature: A Unicode string and MUST be set to "MSFT100".
-
-    MS Vendor Code: An unsigned byte, it will be used to retrieve associated feature descriptors.
-
-    Pad: An unsigned byte and MUST be set to 0x00.
-
-    The Signature field contains a Unicode character array that identifies the descriptor as an 
-    OS string descriptor and includes the version number. For version 1.00, this array must be set 
-    to "MSFT100" (0x4D00 0x5300 0x4600 0x5400 0x3100 0x3000 0x3000).
-
-    The MS VendorCode field is used to retrieve the associated feature descriptors. This code is 
-    used as Request field in TS_URB_CONTROL_VENDOR_OR_CLASS_REQUEST section 2.2.9.12.
-
-    In usbFunctionSetup we handle the feature request associated to MS Vendor Code we replied earlier 
-    and send an Extended Compat ID with the information that we want Windows to load the winusb default driver.
-
-    For More information see
-
-    https://docs.microsoft.com/en-us/windows-hardware/drivers/usbcon/microsoft-defined-usb-descriptors
-    https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpeusb/c2f351f9-84d2-4a1b-9fe3-a6ca195f84d0
-
-
-    !!! Notice !!!
-
-    "After the operating system requests a Microsoft OS String Descriptor from a device, it creates the following registry key:
-
-    HLKM\SYSTEM\CurrentControlSet\Control\UsbFlags\vvvvpppprrrrr
-
-    The operating system creates a registry entry, named osvc, under this registry key that indicates 
-    whether the device supports Microsoft OS Descriptors. If the device does not provide a valid response 
-    the first time that the operating system queries it for a Microsoft OS String Descriptor, 
-    the operating system will make no further requests for that descriptor."
-
-    If your firmware doesn't work please delete the registry key as stated above to retrigger a query from Windows.
-
-    i.e. if your firmware has a device version of 0x07, 0x01 then there will be a registry key with the name :
-
-    Computer\HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\usbflags\16C005DC0107
+    
+    Move from Microsoft OS 1.0 Descriptors to Microsoft OS 2.0 Descriptors. This configuration MUST have a serial to work. 
+    
+    Also it seems to work with USB 3.0 ports ( at least it seems to work in my limited testing ).
+    
+    TODO: Write comments how it works ...
 
 */
 
@@ -125,12 +62,10 @@ usbMsgLen_t usbFunctionDescriptor(struct usbRequest *rq) {
 
     usbMsgLen_t len = 0;
 
-    /* string (3) request at index 0xEE, is an OS string descriptor request */   
-
-    if((rq->wValue.bytes[1] == USBDESCR_STRING) && (rq->wValue.bytes[0] == MS_1_0_OS_DESCRIPTOR_INDEX)) {
-        usbMsgPtr = (usbMsgPtr_t)&MS_1_0_OS_STRING_DESCRIPTOR;
-        len = sizeof(MS_1_0_OS_STRING_DESCRIPTOR);
-
+    /* BOS Descriptor */
+    if((rq->wValue.bytes[1] == USBDESCR_BOS) && (rq->wValue.bytes[0] == 0x00)) {
+	    usbMsgPtr = (usbMsgPtr_t)&BOS_DESCRIPTOR;
+	    len = sizeof(BOS_DESCRIPTOR);
     }
 
     return len;
@@ -149,7 +84,7 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
         if((data[0] & USBRQ_RCPT_MASK) == USBRQ_RCPT_DEVICE) {
 
             if (data[1] == USBASP_FUNC_CONNECT) {
-                uart_disable(); // make it not interefere.
+                uart_disable(); // make it not interfere.
 
                 /* set SCK speed */
                 ispSetSCKOption(prog_sck);
@@ -294,44 +229,15 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
                  replyBuffer[2] = 0;
                  replyBuffer[3] = 0;
                  len = 4;
-
-            /*  Handle the OS feature request associated with the MS Vendor Code
-                we replied earlier in the OS String Descriptor request. See usbFunctionDescriptor. */
-            } else if((data[1] == MS_1_0_VENDOR_CODE) &&
-                    (data[4] == MS_1_0_EXTEND_COMPAT_ID_FEATURE_INDEX)) {
-
-                        /* Send the Extended Compat ID OS feature descriptor, 
-                        requesting to load the default winusb driver for us */
+              
+            /*  Handle the BOS request associated with the MS Vendor Code
+                we replied earlier in the BOS Descriptor request. See usbFunctionDescriptor. */
+            } else if((data[1] == VENDOR_CODE) &&
+                    (data[4] == MS_OS_2_0_DESCRIPTOR_INDEX)) {
                         usbMsgFlags = USB_FLG_MSGPTR_IS_ROM;
-                        usbMsgPtr = (usbMsgPtr_t)&MS_1_0_OS_EXTENDED_COMPAT_ID_FEATURE;
-                        return sizeof(MS_1_0_OS_EXTENDED_COMPAT_ID_FEATURE);
+                        usbMsgPtr = (usbMsgPtr_t)&MS_2_0_OS_DESCRIPTOR_SET;
+                        return sizeof(MS_2_0_OS_DESCRIPTOR_SET);
                     }
-               
-        /* Device Requests for Interfaces */
-               
-        } else if((data[0] & USBRQ_RCPT_MASK) == USBRQ_RCPT_INTERFACE) { 
-
-            switch(data[1]) {
-                case MS_1_0_VENDOR_CODE:
-                    if(data[4] == MS_1_0_EXTEND_PROPERTIES_FEATURE_INDEX) {
-                         usbMsgFlags = USB_FLG_MSGPTR_IS_ROM;
-                         switch(data[2]) {
-                             case 0:
-                                usbMsgPtr = (usbMsgPtr_t)&MS_1_0_OS_EXTENDED_PROPERTIES_FEATURE_INTF0;
-                                return sizeof(MS_1_0_OS_EXTENDED_PROPERTIES_FEATURE_INTF0);
-                             break;
-                             case 1:
-                                usbMsgPtr = (usbMsgPtr_t)&MS_1_0_OS_EXTENDED_PROPERTIES_FEATURE_INTF1;
-                                return sizeof(MS_1_0_OS_EXTENDED_PROPERTIES_FEATURE_INTF1);
-                             break;
-                             default:
-                             break;
-                         }
-                     }
-                break;
-                default:
-                break;
-            }
             
         }
 
@@ -374,7 +280,7 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
 
 uchar usbFunctionRead(uchar *data, uchar len) {
 
-    uchar i;
+	uchar i;
 
     /* check if programmer is in correct read state */
     if ((prog_state != PROG_STATE_READFLASH) && (prog_state
@@ -572,7 +478,8 @@ void usbFunctionWriteOut(uchar *data, uchar len){
                 *CBUF_GetPushEntryPtr(tx_Q) = *data++;
                 CBUF_AdvancePushIdx(tx_Q);                                              
             }while(--len);
-                        
+
+                      
         }
         
 }
@@ -584,7 +491,6 @@ void HID_EP_1_IN(){
 */
     /* As we don't use EEPROM use the EEAR register as variable */
     EEAR = 0;
-    interruptBuffer[7] = EEAR;
     
     /*  We fill the first 7 bytes of the report from
         the receive buffer if they are exist. */
@@ -592,6 +498,7 @@ void HID_EP_1_IN(){
         interruptBuffer[EEAR++] = CBUF_Get(rx_Q, 0);
         CBUF_AdvancePopIdx(rx_Q);
     }
+    interruptBuffer[7] = EEAR;
 
     /*  The 8th byte holds the serial bytes count if the 
         receive buffer is empty or the serial count is at 
@@ -606,12 +513,13 @@ void HID_EP_1_IN(){
         in the receive buffer is 7 or smaller. Effectively increased
         the capability to use 9600 baud reliably. */
         
-    if ((!(CBUF_IsEmpty(rx_Q))) && (EEAR == 7) && (CBUF_Get(rx_Q, 0) > 7)) {
-        interruptBuffer[EEAR] = CBUF_Get(rx_Q, 0);
-        CBUF_AdvancePopIdx(rx_Q);        
-    } else {       
-        interruptBuffer[7] = EEAR;
-    }
+    if(!(CBUF_IsEmpty(rx_Q))){
+		uint8_t tmp = CBUF_Get(rx_Q, 0);
+		if((EEAR == 7) && (tmp > EEAR)) {
+			interruptBuffer[EEAR] = tmp;
+			CBUF_AdvancePopIdx(rx_Q);        
+		}
+	}
     
     usbSetInterrupt(interruptBuffer, sizeof(interruptBuffer));
 }
