@@ -17,14 +17,14 @@
 
 #define USBDESCR_DEVICE_CAPABILITY_TYPE                0x10
 
-#define USBDESCR_DEVICE_CAPABILITY_CONTAINER_ID	       0x04
-#define USBDESCR_DEVICE_CAPABILITY_PLATFORM	           0x05
+#define USBDESCR_DEVICE_CAPABILITY_CONTAINER_ID        0x04
+#define USBDESCR_DEVICE_CAPABILITY_PLATFORM            0x05
 
 #define MS_OS_2_0_DESCRIPTOR_INDEX                     0x07
 #define MS_OS_20_SET_ALT_ENUMERATION                   0x08
 
 #define MS_OS_20_SET_HEADER_DESCRIPTOR                 0x00, 0x00
-#define MS_OS_20_SUBSET_HEADER_CONFIGURATION           0x01, 0x00 
+#define MS_OS_20_SUBSET_HEADER_CONFIGURATION           0x01, 0x00
 #define MS_OS_20_SUBSET_HEADER_FUNCTION                0x02, 0x00
 #define MS_OS_20_FEATURE_COMPATIBLE_ID                 0x03, 0x00
 #define MS_OS_20_FEATURE_REG_PROPERTY                  0x04, 0x00
@@ -129,7 +129,7 @@ PROGMEM const char BOS_DESCRIPTOR[] = {
     
     /* BOS Descriptor Header */
     0x05,                                                  /* Size of descriptor */
-    USBDESCR_BOS,                                          /* BOS Descriptor type */
+    USBDESCR_BOS,                                          /* Descriptor type */
     0x35, 0x00,                                            /* Length of this descriptor and all of its sub descriptors */
     0x02,                                                  /* The number of separate device capability descriptors in the BOS */
 
@@ -148,7 +148,7 @@ PROGMEM const char BOS_DESCRIPTOR[] = {
     0x00,                                                  /* Reserved */
     0xDF, 0x60, 0xDD, 0xD8, 0x89, 0x45, 0xC7, 0x4C,        /* MS OS 2.0 Platform Capability */
     0x9C, 0xD2, 0x65, 0x9D, 0x9E, 0x64, 0x8A, 0x9F,        /* {D8DD60DF-4589-4CC7-9CD2-659D9E648A9F} */
-    0x00, 0x00, 0x03, 0x06,                                /* Windows Version - Windows 7 or later */
+    0x00, 0x00, 0x03, 0x06,                                /* Windows Version - Windows 8.1 or later */
     0xA6, 0x00,                                            /* Size of MS OS 2.0 Descriptor set */
     VENDOR_CODE,                                           /* Vendor Request Code */
     0x00                                                   /* Alternate Enumeration support - 0 No support */
@@ -161,7 +161,7 @@ PROGMEM const char MS_2_0_OS_DESCRIPTOR_SET[] = {
     /* MS OS 2.0 Descriptor Set Header */
     0x0A, 0x00,                                            /* Size of descriptor */
     MS_OS_20_SET_HEADER_DESCRIPTOR,                        /* Descriptor Type */
-    0x00, 0x00, 0x03, 0x06,                                /* Windows Version - Windows 7 or later */
+    0x00, 0x00, 0x03, 0x06,                                /* Windows Version - Windows 8.1 or later */
     0xA6, 0x00,                                            /* Size of MS OS 2.0 Descriptor set */
     
     /* MS OS 2.0 Function Subset Header */
@@ -183,12 +183,12 @@ PROGMEM const char MS_2_0_OS_DESCRIPTOR_SET[] = {
     MS_OS_20_REG_PROPERTY_REG_SZ,                          /* The type of registry property */
     0x28, 0x00,                                            /* The length of the property name */
     'D',0x00,'e',0x00,'v',0x00,'i',0x00,'c',0x00,          /* The name of the property name */
-    'e',0x00,'I',0x00,'n',0x00,'t',0x00,'e',0x00,          /*    -//-    */ 
+    'e',0x00,'I',0x00,'n',0x00,'t',0x00,'e',0x00,          /*    -//-    */
     'r',0x00,'f',0x00,'a',0x00,'c',0x00,'e',0x00,          /*    -//-    */
     'G',0x00,'U',0x00,'I',0x00,'D',0x00,0x00,0x00,         /*    -//-    */
     0x4e, 0x00,                                            /* The length of property data */
     '{',0x00,'A',0x00,'D',0x00,'5',0x00,'7',0x00,          /* Property data */
-    'D',0x00,'3',0x00,'B',0x00,'9',0x00,'-',0x00,          /*    -//-    */ 
+    'D',0x00,'3',0x00,'B',0x00,'9',0x00,'-',0x00,          /*    -//-    */
     '1',0x00,'1',0x00,'6',0x00,'6',0x00,'-',0x00,          /*    -//-    */
     '4',0x00,'3',0x00,'F',0x00,'8',0x00,'-',0x00,          /*    -//-    */
     '8',0x00,'7',0x00,'9',0x00,'0',0x00,'-',0x00,          /*    -//-    */
