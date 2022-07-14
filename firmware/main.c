@@ -29,6 +29,8 @@
 #include "tpi.h"
 #include "tpi_defs.h"
 
+#define U162ARR(U16) {(U16) & 0xFF, (U16) >> 8}
+
 static uchar replyBuffer[8];
 static uchar interruptBuffer[8];
 static uchar uartConf_Capabilities_FeatureReport[8] = { 0, 0, 0, 0, USBASP_CAP_0_TPI | USBASP_CAP_HIDUART, USBASP_CAP_12MHZ_CLOCK, 0, 0};
@@ -66,6 +68,12 @@ usbMsgLen_t usbFunctionDescriptor(struct usbRequest *rq) {
     if((rq->wValue.bytes[1] == USBDESCR_BOS) && (rq->wValue.bytes[0] == 0x00)) {
 	    usbMsgPtr = (usbMsgPtr_t)&BOS_DESCRIPTOR;
 	    len = sizeof(BOS_DESCRIPTOR);
+    } else 
+
+    /* Hid Interface Name */
+    if((rq->wValue.bytes[1] == USBDESCR_STRING) && (rq->wValue.bytes[0] == 0x04)) {
+	    usbMsgPtr = (usbMsgPtr_t)&HID_INTERFACE_NAME_STRING;
+	    len = sizeof(HID_INTERFACE_NAME_STRING);
     }
 
     return len;
@@ -73,7 +81,7 @@ usbMsgLen_t usbFunctionDescriptor(struct usbRequest *rq) {
 
 usbMsgLen_t usbFunctionSetup(uchar data[8]) {
 
-    DBG1(0xF5, data, 8);
+    DBG1(0xF1, data, 8);
 
     usbMsgLen_t len = 0;
 
@@ -113,7 +121,7 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
 
                 prog_nbytes = (data[7] << 8) | data[6];
                 prog_state = PROG_STATE_READFLASH;
-                len = 0xff; /* multiple in */
+                len = USB_NO_MSG; /* multiple in */
 
             } else if (data[1] == USBASP_FUNC_READEEPROM) {
 
@@ -122,7 +130,7 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
 
                 prog_nbytes = (data[7] << 8) | data[6];
                 prog_state = PROG_STATE_READEEPROM;
-                len = 0xff; /* multiple in */
+                len = USB_NO_MSG; /* multiple in */
 
             } else if (data[1] == USBASP_FUNC_ENABLEPROG) {
                 replyBuffer[0] = ispEnterProgrammingMode();
@@ -141,7 +149,7 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
                 }
                 prog_nbytes = (data[7] << 8) | data[6];
                 prog_state = PROG_STATE_WRITEFLASH;
-                len = 0xff; /* multiple out */
+                len = USB_NO_MSG; /* multiple out */
 
             } else if (data[1] == USBASP_FUNC_WRITEEEPROM) {
 
@@ -152,7 +160,7 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
                 prog_blockflags = 0;
                 prog_nbytes = (data[7] << 8) | data[6];
                 prog_state = PROG_STATE_WRITEEEPROM;
-                len = 0xff; /* multiple out */
+                len = USB_NO_MSG; /* multiple out */
 
             } else if (data[1] == USBASP_FUNC_SETLONGADDRESS) {
 
@@ -215,13 +223,13 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
                 prog_address = (data[3] << 8) | data[2];
                 prog_nbytes = (data[7] << 8) | data[6];
                 prog_state = PROG_STATE_TPI_READ;
-                len = 0xff; /* multiple in */
+                len = USB_NO_MSG; /* multiple in */
 
             } else if (data[1] == USBASP_FUNC_TPI_WRITEBLOCK) {
                 prog_address = (data[3] << 8) | data[2];
                 prog_nbytes = (data[7] << 8) | data[6];
                 prog_state = PROG_STATE_TPI_WRITE;
-                len = 0xff; /* multiple out */
+                len = USB_NO_MSG; /* multiple out */
 
             } else if(data[1] == USBASP_FUNC_GETCAPABILITIES) {
                  replyBuffer[0] = USBASP_CAP_0_TPI | USBASP_CAP_HIDUART;
@@ -252,14 +260,14 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
                     switch(data[1]) {
                         case USBRQ_HID_GET_REPORT:
                             
-                            usbMsgPtr = uartConf_Capabilities_FeatureReport;
+                            usbMsgPtr = (usbMsgPtr_t)&uartConf_Capabilities_FeatureReport;
                             return sizeof(uartConf_Capabilities_FeatureReport);
                             
                         case USBRQ_HID_SET_REPORT:
                         
                             if (((data[6]<<8)|data[5]) != 0){
                                 prog_state = PROG_STATE_SET_REPORT;
-                                len = 0xff; /* multiple in */
+                                len = USB_NO_MSG; /* multiple in */
                             }
                             break;
                             
@@ -273,14 +281,16 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
         }
     }
 
-    usbMsgPtr = replyBuffer;
+    usbMsgPtr = (usbMsgPtr_t)&replyBuffer;
 
     return len;
 }
 
 uchar usbFunctionRead(uchar *data, uchar len) {
 
-	uchar i;
+    DBG1(0xF2, data, 8);
+
+    uchar i;
 
     /* check if programmer is in correct read state */
     if ((prog_state != PROG_STATE_READFLASH) && (prog_state
@@ -307,7 +317,7 @@ uchar usbFunctionRead(uchar *data, uchar len) {
             prog_address++;
         }
     }
-
+    
     /* last packet? */
     if (len < 8) {
         prog_state = PROG_STATE_IDLE;
@@ -318,6 +328,8 @@ uchar usbFunctionRead(uchar *data, uchar len) {
 
 uchar usbFunctionWrite(uchar *data, uchar len) {
 
+    DBG1(0xF3, data, 8);
+    
     uchar retVal = 0;
     uchar i;
 
@@ -441,6 +453,8 @@ uchar usbFunctionWrite(uchar *data, uchar len) {
 /* Host to device. Endpoint 1 Output */
 void usbFunctionWriteOut(uchar *data, uchar len){
 
+    DBG1(0xF4, data, 8);
+
 /*
     AFAIU, interrupt out must be exactly 8 bytes long for USB 1.1 .
 */
@@ -486,12 +500,13 @@ void usbFunctionWriteOut(uchar *data, uchar len){
 
 /* Device to host. Endpoint 1 Input */
 void HID_EP_1_IN(){
+
 /*
     AFAIU, interrupt requests must be exactly 8 bytes long for USB 1.1 .   
 */
     /* As we don't use EEPROM use the EEAR register as variable */
     EEAR = 0;
-    
+
     /*  We fill the first 7 bytes of the report from
         the receive buffer if they are exist. */
     while((!(CBUF_IsEmpty(rx_Q))) && (EEAR != 7)){
@@ -514,13 +529,13 @@ void HID_EP_1_IN(){
         the capability to use 9600 baud reliably. */
         
     if(!(CBUF_IsEmpty(rx_Q))){
-		uint8_t tmp = CBUF_Get(rx_Q, 0);
-		if((EEAR == 7) && (tmp > EEAR)) {
-			interruptBuffer[EEAR] = tmp;
-			CBUF_AdvancePopIdx(rx_Q);        
-		}
-	}
-    
+        uint8_t tmp = CBUF_Get(rx_Q, 0);
+        if((EEAR == 7) && (tmp > EEAR)) {
+            interruptBuffer[EEAR] = tmp;
+            CBUF_AdvancePopIdx(rx_Q);        
+        }
+    }
+
     usbSetInterrupt(interruptBuffer, sizeof(interruptBuffer));
 }
 
