@@ -46,9 +46,9 @@ PROGMEM const char usbDescriptorDevice[] = {
     0x12,                                                   /* sizeof(usbDescriptorDevice): length of descriptor in bytes */
     USBDESCR_DEVICE,                                        /* descriptor type */
     0x01, 0x02,                                             /* USB version supported */
-    0x00,
-    0x00,
-    0x00,                                                   /* protocol */
+    USB_CFG_INTERFACE_CLASS,
+    USB_CFG_DEVICE_SUBCLASS,
+    USB_CFG_INTERFACE_PROTOCOL,                             /* protocol */
     8,                                                      /* max packet size */
     /* the following two casts affect the first byte of the constant only, but
     *  that's sufficient to avoid a warning with the default values.
@@ -97,7 +97,7 @@ PROGMEM const char usbDescriptorConfiguration[] = {
     0x03,                                                   /* USB_CFG_INTERFACE_CLASS */
     0,                                                      /* USB_CFG_INTERFACE_SUBCLASS */
     0,                                                      /* USB_CFG_INTERFACE_PROTOCOL */
-    2,                                                      /* string index for interface */
+    4,                                                      /* string index for interface */
 
     9,                                                      /* sizeof(usbDescrInterface): length of descriptor in bytes */
     USBDESCR_HID,                                           /* descriptor type */
@@ -122,6 +122,11 @@ PROGMEM const char usbDescriptorConfiguration[] = {
     8, 0,                                                   /* maximum packet size */
     USB_CFG_INTR_POLL_INTERVAL, /* in ms */
 
+};
+
+PROGMEM const int HID_INTERFACE_NAME_STRING[] = {
+    USB_STRING_DESCRIPTOR_HEADER(11),
+    'U', 'S', 'B', 'a', 's', 'p', ' ', 'U', 'A', 'R', 'T'
 };
 
 /* BOS Descriptor */
@@ -149,7 +154,7 @@ PROGMEM const char BOS_DESCRIPTOR[] = {
     0xDF, 0x60, 0xDD, 0xD8, 0x89, 0x45, 0xC7, 0x4C,        /* MS OS 2.0 Platform Capability */
     0x9C, 0xD2, 0x65, 0x9D, 0x9E, 0x64, 0x8A, 0x9F,        /* {D8DD60DF-4589-4CC7-9CD2-659D9E648A9F} */
     0x00, 0x00, 0x03, 0x06,                                /* Windows Version - Windows 8.1 or later */
-    0xA6, 0x00,                                            /* Size of MS OS 2.0 Descriptor set */
+    0x36, 0x01,                                            /* Size of MS OS 2.0 Descriptor set */
     VENDOR_CODE,                                           /* Vendor Request Code */
     0x00                                                   /* Alternate Enumeration support - 0 No support */
 
@@ -162,8 +167,15 @@ PROGMEM const char MS_2_0_OS_DESCRIPTOR_SET[] = {
     0x0A, 0x00,                                            /* Size of descriptor */
     MS_OS_20_SET_HEADER_DESCRIPTOR,                        /* Descriptor Type */
     0x00, 0x00, 0x03, 0x06,                                /* Windows Version - Windows 8.1 or later */
-    0xA6, 0x00,                                            /* Size of MS OS 2.0 Descriptor set */
-    
+    0x36, 0x01,                                            /* Size of MS OS 2.0 Descriptor set */
+
+    /* MS OS 2.0 Configuration Subset Header */
+    0x08, 0x00,                                            /* Size of descriptor */
+    MS_OS_20_SUBSET_HEADER_CONFIGURATION,                  /* Descriptor Type */
+    0x00,                                                  /* The configuration value for the USB configuration to which this subset applies. */
+    0x00,                                                  /* Reserved */
+    0x2C, 0x01,                                            /* The size of entire configuration subset including this header. */
+
     /* MS OS 2.0 Function Subset Header */
     0x08, 0x00,                                            /* Size of descriptor */
     MS_OS_20_SUBSET_HEADER_FUNCTION,                       /* Descriptor Type */
@@ -193,6 +205,32 @@ PROGMEM const char MS_2_0_OS_DESCRIPTOR_SET[] = {
     '4',0x00,'3',0x00,'F',0x00,'8',0x00,'-',0x00,          /*    -//-    */
     '8',0x00,'7',0x00,'9',0x00,'0',0x00,'-',0x00,          /*    -//-    */
     '0',0x00,'B',0x00,'E',0x00,'1',0x00,'4',0x00,          /*    -//-    */
+    'D',0x00,'D',0x00,'C',0x00,'7',0x00,'5',0x00,          /*    -//-    */
+    '0',0x00,'4',0x00,'}',0x00,0x00,0x00,                  /*    -//-    */
+
+    /* MS OS 2.0 Function Subset Header */
+    0x08, 0x00,                                            /* Size of descriptor */
+    MS_OS_20_SUBSET_HEADER_FUNCTION,                       /* Descriptor Type */
+    0x01,                                                  /* The interface number for the first interface of the function to which this subset applies. */
+    0x00,                                                  /* Reserved */
+    0x88, 0x00,                                            /* The size of entire function subset including this header. */
+
+    /* MS OS 2.0 Registry Property Descriptor */
+    0x80, 0x00,                                            /* Size of descriptor */
+    MS_OS_20_FEATURE_REG_PROPERTY,                         /* Descriptor Type */
+    MS_OS_20_REG_PROPERTY_REG_SZ,                          /* The type of registry property */
+    0x28, 0x00,                                            /* The length of the property name */
+    'D',0x00,'e',0x00,'v',0x00,'i',0x00,'c',0x00,          /* The name of the property name */
+    'e',0x00,'I',0x00,'n',0x00,'t',0x00,'e',0x00,          /*    -//-    */
+    'r',0x00,'f',0x00,'a',0x00,'c',0x00,'e',0x00,          /*    -//-    */
+    'G',0x00,'U',0x00,'I',0x00,'D',0x00,0x00,0x00,         /*    -//-    */
+    0x4e, 0x00,                                            /* The length of property data */
+    '{',0x00,'A',0x00,'D',0x00,'5',0x00,'7',0x00,          /* Property data */
+    'D',0x00,'3',0x00,'B',0x00,'9',0x00,'-',0x00,          /*    -//-    */
+    '1',0x00,'1',0x00,'6',0x00,'6',0x00,'-',0x00,          /*    -//-    */
+    '4',0x00,'3',0x00,'F',0x00,'8',0x00,'-',0x00,          /*    -//-    */
+    '8',0x00,'7',0x00,'9',0x00,'0',0x00,'-',0x00,          /*    -//-    */
+    '1',0x00,'B',0x00,'E',0x00,'1',0x00,'4',0x00,          /*    -//-    */
     'D',0x00,'D',0x00,'C',0x00,'7',0x00,'5',0x00,          /*    -//-    */
     '0',0x00,'4',0x00,'}',0x00,0x00,0x00                   /*    -//-    */
 
