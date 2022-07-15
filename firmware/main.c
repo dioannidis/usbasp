@@ -29,11 +29,8 @@
 #include "tpi.h"
 #include "tpi_defs.h"
 
-#define U162ARR(U16) {(U16) & 0xFF, (U16) >> 8}
-
 static uchar replyBuffer[8];
 static uchar interruptBuffer[8];
-static uchar uartConf_Capabilities_FeatureReport[8] = { 0, 0, 0, 0, USBASP_CAP_0_TPI | USBASP_CAP_HIDUART, USBASP_CAP_12MHZ_CLOCK, 0, 0};
 
 static uchar prog_state = PROG_STATE_IDLE;
 uchar prog_sck = USBASP_ISP_SCK_AUTO;
@@ -66,14 +63,8 @@ usbMsgLen_t usbFunctionDescriptor(struct usbRequest *rq) {
 
     /* BOS Descriptor */
     if((rq->wValue.bytes[1] == USBDESCR_BOS) && (rq->wValue.bytes[0] == 0x00)) {
-	    usbMsgPtr = (usbMsgPtr_t)&BOS_DESCRIPTOR;
-	    len = sizeof(BOS_DESCRIPTOR);
-    } else 
-
-    /* Hid Interface Name */
-    if((rq->wValue.bytes[1] == USBDESCR_STRING) && (rq->wValue.bytes[0] == 0x04)) {
-	    usbMsgPtr = (usbMsgPtr_t)&HID_INTERFACE_NAME_STRING;
-	    len = sizeof(HID_INTERFACE_NAME_STRING);
+        usbMsgPtr = (usbMsgPtr_t)&BOS_DESCRIPTOR;
+        len = sizeof(BOS_DESCRIPTOR);
     }
 
     return len;
@@ -232,25 +223,26 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
                 len = USB_NO_MSG; /* multiple out */
 
             } else if(data[1] == USBASP_FUNC_GETCAPABILITIES) {
-                 replyBuffer[0] = USBASP_CAP_0_TPI | USBASP_CAP_HIDUART;
-                 replyBuffer[1] = USBASP_CAP_12MHZ_CLOCK;
+                 replyBuffer[0] = featureReport[4];
+                 replyBuffer[1] = featureReport[5];
                  replyBuffer[2] = 0;
                  replyBuffer[3] = 0;
                  len = 4;
-              
+
             /*  Handle the BOS request associated with the MS Vendor Code
                 we replied earlier in the BOS Descriptor request. See usbFunctionDescriptor. */
             } else if((data[1] == VENDOR_CODE) &&
                     (data[4] == MS_OS_2_0_DESCRIPTOR_INDEX)) {
                         usbMsgFlags = USB_FLG_MSGPTR_IS_ROM;
                         usbMsgPtr = (usbMsgPtr_t)&MS_2_0_OS_DESCRIPTOR_SET;
-                        return sizeof(MS_2_0_OS_DESCRIPTOR_SET);
+                        len = sizeof(MS_2_0_OS_DESCRIPTOR_SET);
+                        goto dontAssMsgPtr;
                     }
             
         }
 
     /* Interface Requests */
-        
+
     } else if((data[0] & USBRQ_TYPE_MASK) == USBRQ_TYPE_CLASS){
 
         if((data[0] & USBRQ_RCPT_MASK) == USBRQ_RCPT_INTERFACE){
@@ -259,36 +251,40 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
                 case 3 : // Feature Report
                     switch(data[1]) {
                         case USBRQ_HID_GET_REPORT:
-                            
-                            usbMsgPtr = (usbMsgPtr_t)&uartConf_Capabilities_FeatureReport;
-                            return sizeof(uartConf_Capabilities_FeatureReport);
-                            
+
+                            usbMsgPtr = (usbMsgPtr_t)&featureReport;
+                            len = sizeof(featureReport);
+                            goto dontAssMsgPtr;
+
                         case USBRQ_HID_SET_REPORT:
-                        
+
                             if (((data[6]<<8)|data[5]) != 0){
+
                                 prog_state = PROG_STATE_SET_REPORT;
                                 len = USB_NO_MSG; /* multiple in */
+
                             }
                             break;
-                            
                         default:
                         break;
                     }
                     break;
                 default:
                 break;
-            }            
+            }
         }
     }
 
     usbMsgPtr = (usbMsgPtr_t)&replyBuffer;
+
+dontAssMsgPtr:
 
     return len;
 }
 
 uchar usbFunctionRead(uchar *data, uchar len) {
 
-    DBG1(0xF2, data, 8);
+    DBG1(0xF2, data, len);
 
     uchar i;
 
@@ -328,7 +324,7 @@ uchar usbFunctionRead(uchar *data, uchar len) {
 
 uchar usbFunctionWrite(uchar *data, uchar len) {
 
-    DBG1(0xF3, data, 8);
+    DBG1(0xF3, data, len);
     
     uchar retVal = 0;
     uchar i;
@@ -399,24 +395,23 @@ uchar usbFunctionWrite(uchar *data, uchar len) {
     if(prog_state == PROG_STATE_SET_REPORT) 
     {
 
+
         /*  The first 2 bytes are the uart prescaler ( low byte first then high byte second ) 
             UART settings. The 3rd byte is a bitmask for parity, stop bit and data bit. 
             The 4th byte is reserved for future.
             
             The last 4 bytes are the USBasp capabilities which are readonly. */
             
-        for (i = 0; i < 3; i++) {            
-            uartConf_Capabilities_FeatureReport[i] = *data != 0 ? *data : 0;
-            data++;
-        }
-        
-        /*  Disabling uart communication before applying new values. */            
+        featureReport[0] = data[0];
+        featureReport[1] = data[1];
+        featureReport[2] = data[2];
+
         uart_disable();
         
-        uint16_t baud  = (uartConf_Capabilities_FeatureReport[1]<<8)|uartConf_Capabilities_FeatureReport[0];
-        uint8_t  par   = uartConf_Capabilities_FeatureReport[2] & USBASP_UART_PARITY_MASK;
-        uint8_t  stop  = uartConf_Capabilities_FeatureReport[2] & USBASP_UART_STOP_MASK;
-        uint8_t  bytes = uartConf_Capabilities_FeatureReport[2] & USBASP_UART_BYTES_MASK;
+        uint16_t baud  = (featureReport[1]<<8)|featureReport[0];
+        uint8_t  par   = featureReport[2] & USBASP_UART_PARITY_MASK;
+        uint8_t  stop  = featureReport[2] & USBASP_UART_STOP_MASK;
+        uint8_t  bytes = featureReport[2] & USBASP_UART_BYTES_MASK;
         
             
         /*  To enable the uart the baud needs to be non zero. Meaning that to disable the 

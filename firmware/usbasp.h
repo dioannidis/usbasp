@@ -99,4 +99,15 @@
 #define ledGreenOff()                   DDRC &= ~(1 << PC0)
 #define ledGreenOn()                    DDRC |= (1 << PC0)
 
+static uchar featureReport[8] = {
+    0,                                             /* Prescaler Low byte */
+    0,                                             /* Prescaler High byte */
+    0,                                             /* Bitmask Parity, StopBit and DataBit */
+    0,                                             /* Reserved */
+    USBASP_CAP_0_TPI | USBASP_CAP_HIDUART,         /* Device Capabilities */
+    USBASP_CAP_12MHZ_CLOCK,                        /* Device Crystal      */
+    0,                                             /* Reserved            */
+    0                                              /* Reserved            */
+  };
+
 #endif /* USBASP_H_ */
