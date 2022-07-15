@@ -61,9 +61,6 @@ type
 
 implementation
 
-uses
-  Math;
-
 { TSPSCRingBuffer }
 
 constructor TSPSCRingBuffer.Create(const ASize: PtrUInt);
