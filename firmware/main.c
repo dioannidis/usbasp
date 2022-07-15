@@ -534,7 +534,7 @@ void HID_EP_1_IN(){
         in the receive buffer is 7 or smaller. Effectively increased
         the capability to use 9600 baud reliably. */
         
-    if(!(CBUF_IsEmpty(rx_Q))){
+    if(!(CBUF_IsEmpty(rx_Q)) && (EEAR == 7)){
         uint8_t tmp = CBUF_Get(rx_Q, 0);
         if((EEAR == 7) && (tmp > EEAR)) {
             interruptBuffer[EEAR] = tmp;
