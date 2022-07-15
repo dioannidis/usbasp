@@ -29,6 +29,17 @@
 #include "tpi.h"
 #include "tpi_defs.h"
 
+static uchar featureReport[8] = {
+    0,                                             /* Prescaler Low byte */
+    0,                                             /* Prescaler High byte */
+    0,                                             /* Bitmask Parity, StopBit and DataBit */
+    0,                                             /* Reserved */
+    USBASP_CAP_0_TPI | USBASP_CAP_HIDUART,         /* Device Capabilities */
+    USBASP_CAP_12MHZ_CLOCK,                        /* Device Crystal      */
+    0,                                             /* Reserved            */
+    0                                              /* Reserved            */
+  };
+
 static uchar replyBuffer[8];
 static uchar interruptBuffer[8];
 
