@@ -11,6 +11,8 @@
 #ifndef __usb_descriptors_h_included__
 #define __usb_descriptors_h_included__
 
+#define U162ARR(U16) {(U16) & 0xFF, (U16) >> 8}
+
 #define VENDOR_CODE                                    0x5D        /* Can be anything (0 - 255) */
 
 #define USBDESCR_BOS                                   0x0F
@@ -97,7 +99,7 @@ PROGMEM const char usbDescriptorConfiguration[] = {
     0x03,                                                   /* USB_CFG_INTERFACE_CLASS */
     0,                                                      /* USB_CFG_INTERFACE_SUBCLASS */
     0,                                                      /* USB_CFG_INTERFACE_PROTOCOL */
-    4,                                                      /* string index for interface */
+    2,                                                      /* string index for interface */
 
     9,                                                      /* sizeof(usbDescrInterface): length of descriptor in bytes */
     USBDESCR_HID,                                           /* descriptor type */
@@ -112,21 +114,16 @@ PROGMEM const char usbDescriptorConfiguration[] = {
     USBDESCR_ENDPOINT,                                      /* descriptor type = endpoint */
     (char)0x81,                                             /* IN endpoint number 1 */
     0x03,                                                   /* attrib: Interrupt endpoint */
-    8, 0,                                                   /* maximum packet size */
+    0x08, 0x00,                                             /* maximum packet size */
     USB_CFG_INTR_POLL_INTERVAL, /* in ms */
 
     7,                                                      /* sizeof(usbDescrEndpoint) */
     USBDESCR_ENDPOINT,                                      /* descriptor type = endpoint */
     (char)0x01,                                             /* OUT endpoint number 1 */
     0x03,                                                   /* attrib: Interrupt endpoint */
-    8, 0,                                                   /* maximum packet size */
+    0x08, 0x00,                                             /* maximum packet size */
     USB_CFG_INTR_POLL_INTERVAL, /* in ms */
 
-};
-
-PROGMEM const int HID_INTERFACE_NAME_STRING[] = {
-    USB_STRING_DESCRIPTOR_HEADER(11),
-    'U', 'S', 'B', 'a', 's', 'p', ' ', 'U', 'A', 'R', 'T'
 };
 
 /* BOS Descriptor */
