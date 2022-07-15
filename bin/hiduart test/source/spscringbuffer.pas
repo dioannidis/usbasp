@@ -103,10 +103,7 @@ begin
 {$PUSH}
 {$Q-}
 {$R-}
-  if ReadIndex > WriteIndex then
-    Result := WriteIndex + (PtrUInt.MaxValue - ReadIndex)
-  else
-    Result := WriteIndex - ReadIndex;
+  Result := MaskIndex(WriteIndex - ReadIndex);
 {$POP}
 end;
 
