@@ -123,7 +123,10 @@ end;
 
 function TSPSCRingBuffer.PeekByte(AIndex: PtrUInt): byte;
 begin
+{$PUSH}
+{$Q-}
   Result := pbyte(FMemoryData)[MaskIndex(FReadIndex + AIndex)];
+{$POP}
 end;
 
 function TSPSCRingBuffer.Read(out ABuffer; const ALength: PtrUInt): PtrUInt;
