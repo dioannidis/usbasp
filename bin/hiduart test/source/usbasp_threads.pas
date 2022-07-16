@@ -102,28 +102,25 @@ end;
 procedure TThreadUSBWrite.Execute;
 var
   USBAspHidPacket: array[0..7] of byte = (0, 0, 0, 0, 0, 0, 0, 0);
-  NextByte: byte = 0;
+  SerialCountOrDataByte: byte = 0;
 begin
   repeat
-    USBAspHidPacket[7] := FBuffer.Read(USBAspHidPacket, 7);
-    if USBAspHidPacket[7] > 0 then
+    SerialCountOrDataByte := FBuffer.Peek(USBAspHidPacket, 8);
+
+    if (SerialCountOrDataByte = 8) and (USBAspHidPacket[7] = 7) then
+      SerialCountOrDataByte := 7
+    else
+      if SerialCountOrDataByte < 8 then
+        USBAspHidPacket[7] := SerialCountOrDataByte;
+
+    if SerialCountOrDataByte > 0 then
     begin
-      if (USBAspHidPacket[7] = 7) then
-      begin
-        if FBuffer.Peek(NextByte) = 0 then
-        begin
-          if NextByte > 7 then
-          begin
-            USBAspHidPacket[7] := NextByte;
-            FBuffer.AdvanceReadIdx;
-          end;
-        end;
-      end;
-      repeat
-      until (usbasp_write(FUSBaspDevice, USBAspHidPacket) = 8) or Terminated;
+      if (usbasp_write(FUSBaspDevice, USBAspHidPacket) = 8) then
+        FBuffer.AdvanceReadIdx(SerialCountOrDataByte);
     end
     else
       Sleep(2);
+
   until Terminated;
 end;
 
