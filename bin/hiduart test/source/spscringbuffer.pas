@@ -46,14 +46,14 @@ type
   protected
     function ReadByte: byte;
     procedure WriteByte(const AValue: byte);
-    function PeekByte: byte;
+    function PeekByte(AIndex: PtrUInt = 0): byte;
   public
     constructor Create(const ASize: PtrUInt);
     destructor Destroy; override;
-    function Read(const ABuffer; const ALength: PtrUInt): PtrUInt;
+    function Read(out ABuffer; const ALength: PtrUInt): PtrUInt;
     function Write(const ABuffer; const ALength: PtrUInt): PtrUInt;
-    function Peek(var AValue: byte): PtrInt;
-    procedure AdvanceReadIdx;
+    function Peek(out ABuffer; ALength: PtrUInt): PtrUInt;
+    procedure AdvanceReadIdx(ACount: PtrUInt = 1);
     property Empty: boolean read GetEmpty;
     property Full: boolean read GetFull;
     property Size: PtrUInt read FMemorySize;
@@ -85,7 +85,7 @@ end;
 
 function TSPSCRingBuffer.GetFull: boolean; //inline;
 begin
-  Result := GetCapacity = FMemorySize;
+  Result := GetCapacity = FMemorySize - 1;
 end;
 
 function TSPSCRingBuffer.MaskIndex(const AValue: PtrUInt): PtrUInt; //inline;
@@ -95,15 +95,11 @@ end;
 
 // See : https://forum.lazarus.freepascal.org/index.php/topic,59796.msg446453.html#msg446453
 function TSPSCRingBuffer.GetCapacity: PtrUInt;  //inline;
-var
-  WriteIndex, ReadIndex: PtrUInt;
 begin
-  ReadIndex := FReadIndex;
-  WriteIndex := FWriteIndex;
 {$PUSH}
 {$Q-}
 {$R-}
-  Result := MaskIndex(WriteIndex - ReadIndex);
+  Result := MaskIndex(FWriteIndex - FReadIndex);
 {$POP}
 end;
 
@@ -125,12 +121,12 @@ begin
 {$POP}
 end;
 
-function TSPSCRingBuffer.PeekByte: byte;
+function TSPSCRingBuffer.PeekByte(AIndex: PtrUInt): byte;
 begin
-  Result := pbyte(FMemoryData)[MaskIndex(FReadIndex)];
+  Result := pbyte(FMemoryData)[MaskIndex(FReadIndex + AIndex)];
 end;
 
-function TSPSCRingBuffer.Read(const ABuffer; const ALength: PtrUInt): PtrUInt;
+function TSPSCRingBuffer.Read(out ABuffer; const ALength: PtrUInt): PtrUInt;
 begin
   Result := 0;
   while (not Empty) and (Result < ALength) do
@@ -150,21 +146,21 @@ begin
   end;
 end;
 
-function TSPSCRingBuffer.Peek(var AValue: byte): PtrInt;
+function TSPSCRingBuffer.Peek(out ABuffer; ALength: PtrUInt): PtrUInt;
 begin
-  Result := -1;
-  if not Empty then
+  Result := 0;
+  while (Result < ALength) and (Result < GetCapacity) do
   begin
-    AValue := PeekByte;
-    Result := 0;
+    pbyte(@ABuffer + Result)^ := PeekByte(Result);
+    Inc(Result);
   end;
 end;
 
-procedure TSPSCRingBuffer.AdvanceReadIdx;
+procedure TSPSCRingBuffer.AdvanceReadIdx(ACount: PtrUInt);
 begin
 {$PUSH}
 {$Q-}
-  Inc(FReadIndex);
+  Inc(FReadIndex, ACount);
 {$POP}
 end;
 
