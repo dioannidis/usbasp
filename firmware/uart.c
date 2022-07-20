@@ -72,6 +72,9 @@ ISR(USART_UDRE_vect, ISR_NAKED){
 
 void uart_disable(){
     
+    /* Switch Rx Pullup off */
+    PORTD &= ~(1 << PIND0);
+    
     USBASPUART_UCSRB = 0;
     USBASPUART_UCSRB &= ~(1<<USBASPUART_UDRIE);
 
@@ -122,4 +125,8 @@ void uart_config(uint16_t baud, uint8_t par, uint8_t stop, uint8_t bytes){
 
     // Turn on RX/TX and RX interrupt.
     USBASPUART_UCSRB=(1<<USBASPUART_RXCIE)|(1<<USBASPUART_RXEN)|(1<<USBASPUART_TXEN);
+    
+  	/* Enable Rx Pin Pullup */
+	PORTD |= (1 << PIND0);
+
 }
