@@ -322,11 +322,12 @@ uchar usbFunctionRead(uchar *data, uchar len) {
                 data[i] = ispReadEEPROM(prog_address);
             }
             prog_address++;
+            prog_nbytes--;
         }
     }
     
     /* last packet? */
-    if (len < 8) {
+    if ((len < 8) || (prog_nbytes == 0))  {
         prog_state = PROG_STATE_IDLE;
     }
 
