@@ -15,6 +15,10 @@ This USBasp firmware is based on [a fork by Ralph Doncaster]. Original fork read
 
 Pre-built avrdude 6.3 and 6.4, windows executables, if needed, is in the bin\avrdude-winusb directory. For avrdude v7 the official windows binary from [avrdudes/avrdude] uses libwinusb instead of libusb, which doesn't support composite devices as this firmware implements. Please use the unofficial build from [mcuee] repo.
 
+### UART GUI Client
+
+From release v0.7.0, the [libUSBUARTTerminal] supports this firmware's HID UART implementation.
+
 ### UART HID protocol
 
 > Note: There is a small 128 byte ring buffer for both Tx and Rx. That means you can use higher baud rates ( i.e. 115200 ) if the message length is smaller than 128 bytes and the transmit / receive interval is 160 ms or higher.
@@ -93,4 +97,4 @@ Read from USBasp at index 1 with 19200 baud from a device with 20 MHz crystal
 [UART Flags]: <https://github.com/dioannidis/usbasp/blob/167bf1c785b353cba206a0dbcc7d322f7f49d0b9/firmware/usbasp.h#L76)>
 [mcuee]: <https://github.com/mcuee/avrdude/releases/tag/v7.0>
 [avrdudes/avrdude]: <https://github.com/avrdudes/avrdude>
-
+[libUSBUARTTerminal]: <https://github.com/dioannidis/libUSBUARTTerminal>
