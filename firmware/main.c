@@ -35,7 +35,16 @@ static uchar featureReport[8] = {
     0,                                             /* Bitmask Parity, StopBit and DataBit */
     0,                                             /* Reserved */
     USBASP_CAP_0_TPI | USBASP_CAP_HIDUART,         /* Device Capabilities */
+#if F_CPU == 12000000L
     USBASP_CAP_12MHZ_CLOCK,                        /* Device Crystal      */
+#elif F_CPU == 16000000L                           
+    /* ATmega8 max speed */
+    USBASP_CAP_16MHZ_CLOCK,                        /* Device Crystal      */
+#elif F_CPU == 18000000L
+    USBASP_CAP_18MHZ_CLOCK,                        /* Device Crystal      */
+#elif F_CPU == 20000000L
+    USBASP_CAP_20MHZ_CLOCK,                        /* Device Crystal      */
+#endif
     0,                                             /* Reserved            */
     0                                              /* Reserved            */
   };
