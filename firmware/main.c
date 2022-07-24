@@ -42,6 +42,7 @@ static uchar featureReport[8] = {
 
 static uchar replyBuffer[8];
 static uchar interruptBuffer[8];
+static uchar monitorBuffer[8];
 
 static uchar prog_state = PROG_STATE_IDLE;
 uchar prog_sck = USBASP_ISP_SCK_AUTO;
@@ -90,7 +91,7 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
     /* Device Requests */
 
     if ((data[0] & USBRQ_TYPE_MASK) == USBRQ_TYPE_VENDOR) {
-        
+
         if((data[0] & USBRQ_RCPT_MASK) == USBRQ_RCPT_DEVICE) {
 
             if (data[1] == USBASP_FUNC_CONNECT) {
@@ -114,6 +115,18 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
                 replyBuffer[1] = ispTransmit(data[3]);
                 replyBuffer[2] = ispTransmit(data[4]);
                 replyBuffer[3] = ispTransmit(data[5]);
+
+                /*  To enable the uart the baud needs to be non zero. Meaning that to disable the 
+                uart communication just send a set feature report with the first 2 bytes with zero. */
+                if ((featureReport[1]<<8)|featureReport[0]) {
+                    uart_config(
+                        (featureReport[1]<<8)|featureReport[0],
+                        featureReport[2] & USBASP_UART_PARITY_MASK,
+                        featureReport[2] & USBASP_UART_STOP_MASK,
+                        featureReport[2] & USBASP_UART_BYTES_MASK
+                    );
+                }
+
                 len = 4;
 
             } else if (data[1] == USBASP_FUNC_READFLASH) {
@@ -325,7 +338,7 @@ uchar usbFunctionRead(uchar *data, uchar len) {
             prog_nbytes--;
         }
     }
-    
+
     /* last packet? */
     if ((len < 8) || (prog_nbytes == 0))  {
         prog_state = PROG_STATE_IDLE;
@@ -420,16 +433,15 @@ uchar usbFunctionWrite(uchar *data, uchar len) {
 
         uart_disable();
         
-        uint16_t baud  = (featureReport[1]<<8)|featureReport[0];
-        uint8_t  par   = featureReport[2] & USBASP_UART_PARITY_MASK;
-        uint8_t  stop  = featureReport[2] & USBASP_UART_STOP_MASK;
-        uint8_t  bytes = featureReport[2] & USBASP_UART_BYTES_MASK;
-        
-            
         /*  To enable the uart the baud needs to be non zero. Meaning that to disable the 
             uart communication just send a set feature report with the first 2 bytes with zero. */
-        if (baud) {
-            uart_config(baud, par, stop, bytes);
+        if ((featureReport[1]<<8)|featureReport[0]) {
+            uart_config(
+                (featureReport[1]<<8)|featureReport[0], 
+                featureReport[2] & USBASP_UART_PARITY_MASK, 
+                featureReport[2] & USBASP_UART_STOP_MASK, 
+                featureReport[2] & USBASP_UART_BYTES_MASK
+            );
         }
 
         prog_state = PROG_STATE_IDLE;
@@ -537,13 +549,28 @@ void HID_EP_1_IN(){
         
     if(!(CBUF_IsEmpty(rx_Q)) && (EEAR == 7)){
         uint8_t tmp = CBUF_Get(rx_Q, 0);
-        if((EEAR == 7) && (tmp > EEAR)) {
+        if(tmp > EEAR) {
             interruptBuffer[EEAR] = tmp;
             CBUF_AdvancePopIdx(rx_Q);        
         }
     }
 
     usbSetInterrupt(interruptBuffer, sizeof(interruptBuffer));
+}
+
+/* Device to host. Endpoint 2 Input */
+void HID_EP_3_IN(){
+
+    monitorBuffer[0] = prog_state;
+    monitorBuffer[1] = 0;
+    monitorBuffer[2] = 0;
+    monitorBuffer[3] = 0;
+    monitorBuffer[4] = 0;
+    monitorBuffer[5] = 0;
+    monitorBuffer[6] = 0;
+    monitorBuffer[7] = 0;
+
+    usbSetInterrupt3(monitorBuffer, sizeof(monitorBuffer));
 }
 
 int main(void) {
@@ -579,15 +606,20 @@ int main(void) {
 
         /*  Reenable USB requests if they are 
             disabled and tx buffer is empty. */
-        } else if(CBUF_IsEmpty(tx_Q)) {          
+        } else if(CBUF_IsEmpty(tx_Q)) {
             if(usbAllRequestsAreDisabled()){
                 usbEnableAllRequests();
             }
         }
 
         usbPoll();
+
         if (usbInterruptIsReady()) {
             HID_EP_1_IN();
+        }
+
+        if (usbInterruptIsReady3()) {
+            HID_EP_3_IN();
         }
 
     }
