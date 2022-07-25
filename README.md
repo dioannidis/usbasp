@@ -25,9 +25,9 @@ From release v0.7.0, the [libUSBUARTTerminal] supports this firmware's HID UART 
 
 ##### _Serial Data_
 
-UART HID implementation uses 8 byte size input and output interrupt reports. 
+V-USB implementation uses 8 byte size input and output interrupt reports.
 
-The last byte ( 8th ) has special meaning. It  holds the actual serial bytes count. If its value is greater than 7 then it is serial data. If the value is 7 or smaller then its the serial data count and the remaining bytes are ignored.
+The last byte ( 8th ) has special meaning. Its serial data or its the serial bytes count. If its value is greater than 7 then its serial data. If the value is 7 or smaller then its the serial data count and the remaining bytes are ignored.
 
 _Input Reports ( USBasp -> USB PC )_ or _Output Reports ( USB PC -> USBasp)_
 
