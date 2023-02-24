@@ -43,7 +43,7 @@ i.e.
 
 ##### _UART Configuration_
 
-The USBasp's UART configuration uses a 1 byte size feature report, with the following format.
+The USBasp's UART configuration uses an 8 byte size feature report, with the following format.
 
 | Byte 0   | Byte 1 | Byte 2 | Byte 3 | Byte 4 - 7  RO |
 | -------- | --------- | -------- | -------- | -------- |
