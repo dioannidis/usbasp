@@ -125,8 +125,9 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
                 replyBuffer[2] = ispTransmit(data[4]);
                 replyBuffer[3] = ispTransmit(data[5]);
 
-                /*  To enable the uart the baud needs to be non zero. Meaning that to disable the 
-                uart communication just send a set feature report with the first 2 bytes with zero. */
+                /*  If the prescaler "baud" is non zero then it means that
+                UART was open and it was interrupted by an ISP connect command.
+                Re enable the UART */
                 if ((featureReport[1]<<8)|featureReport[0]) {
                     uart_config(
                         (featureReport[1]<<8)|featureReport[0],
@@ -429,12 +430,11 @@ uchar usbFunctionWrite(uchar *data, uchar len) {
     if(prog_state == PROG_STATE_SET_REPORT) 
     {
 
-
-        /*  The first 2 bytes are the uart prescaler ( low byte first then high byte second ) 
-            UART settings. The 3rd byte is a bitmask for parity, stop bit and data bit. 
-            The 4th byte is reserved for future.
+    /*  The first 2 bytes are the uart prescaler ( low byte first then high byte second ) 
+        UART settings. The 3rd byte is a bitmask for parity, stop bit and data bit. 
+        The 4th byte is reserved for future.
             
-            The last 4 bytes are the USBasp capabilities which are readonly. */
+        The last 4 bytes are the USBasp capabilities which are readonly. */
             
         featureReport[0] = data[0];
         featureReport[1] = data[1];
@@ -442,8 +442,10 @@ uchar usbFunctionWrite(uchar *data, uchar len) {
 
         uart_disable();
         
-        /*  To enable the uart the baud needs to be non zero. Meaning that to disable the 
-            uart communication just send a set feature report with the first 2 bytes with zero. */
+    /*  To enable the UARTT the baud needs to be non zero. 
+        Meaning that to disable the UART communication send a set feature report 
+        with the prescaler ( first 2 bytes ) zeroed. */
+        
         if ((featureReport[1]<<8)|featureReport[0]) {
             uart_config(
                 (featureReport[1]<<8)|featureReport[0], 
@@ -463,9 +465,9 @@ uchar usbFunctionWrite(uchar *data, uchar len) {
 
 /*
  *
- *  As the input and output report are 8 bytes, we store 
- *  the actual serial bytes count at the last byte. The 
- *  remaining bytes are ignored as garbage. 
+ * The V-USB uses 8 byte size input and output interrupt reports.
+ *
+ * The last byte ( 8th ) has special meaning. Its serial data or its the serial bytes count. If its value is greater than 7 then * its serial data. If the value is 7 or smaller then its the serial data count and the remaining bytes are ignored.
  *
  *  i.e.
  *
@@ -475,27 +477,33 @@ uchar usbFunctionWrite(uchar *data, uchar len) {
  *  
  *  0x00,0x34,0x00,0x66,0x32,0x36,0x00,0x04 -> Actual serial bytes 4 : 0x00,0x34,0x00,0x66
  *  
+ * 0x00,0xC3,0x34,0x55,0x32,0xF3,0x00,0xAB -> Actual serial bytes 8 ( 8th byte > 7 ) : 0x00,0xC3,0x34,0x55,0x32,0xF3,0x00,0xAB
+ *
  */
-
 
 /* Host to device. Endpoint 1 Output */
 void usbFunctionWriteOut(uchar *data, uchar len){
 
     DBG1(0xF4, data, 8);
 
-/*
-    AFAIU, interrupt out must be exactly 8 bytes long for USB 1.1 .
-*/
+    /*  The 8th byte ( data[7] ), holds the serial bytes count or
+        is actual serial data, depending on the folowing condition:
 
-    /*  The 8th byte holds the serial bytes count if the 
-        receive buffer is empty or the serial count is at 
-        least 7. If the receive buffer is not empty then if 
-        the next byte in the receive buffer is greater than 7 we 
-        added it to the report else wait for the next 
-        interrupt request. This way the receiver can distinguish 
-        if the 8th byte is serial data or serial data count. 
+        If the next byte value in the buffer is greater than 7
+        then we treated it as serial data and added it to the out 
+        report else the 8th byte holds the serial data count. This
+        way the receiver can distinguish the meaning of the 8th byte
+        if it is serial data or actually the serial data count.                
         
-        Effectively increased the capability to use 9600 baud reliably. */
+        With this algorithm we can reliably send 700 - 800 bytes per second
+        ( the probability to have 100 7 value at the 8th place of report
+        is very low. So the 700 bytes/s is a very rare worst case scenario ), 
+        if the host controller polls every 10ms as the spec for USB 1.1 says. 
+        But in my tests the host controller or the USB 2.0 hub poll the
+        device every ~8 ms, effectively increasing the amount of bytes to
+        send to 875 - 1000 bytes/s ( again below 970 bytes/s is a rare case )
+        which is enough (more or less) for 9600 Baud ( real speed 960 Bytes/s ).
+    */
 
         if (data[7] > 0) {
             if (data[7] < 8) {
@@ -505,13 +513,12 @@ void usbFunctionWriteOut(uchar *data, uchar len){
             len = 0;
         }
         
-        /*  If UART enabled ( RXCIE enabled ) 
-            is there serial data in the report ? */
+    /*  If UART enabled ( RXCIE enabled ) 
+        is there serial data in the report ? */
         if(len && (USBASPUART_UCSRB & (1<<USBASPUART_RXCIE))) {
 
-            /* If the transmit buffer is near full, disable usb requests
-               until the transmit buffer is empty. We rely on 
-               usb trasmit retries to not lose any data. */
+         /* If the transmit buffer is near full, disable usb requests
+            until the transmit buffer is empty. */
             if((CBUF_Len(tx_Q)) + len > (tx_Q_SIZE - 8)) {
                 usbDisableAllRequests();
             }
@@ -520,8 +527,7 @@ void usbFunctionWriteOut(uchar *data, uchar len){
                 *CBUF_GetPushEntryPtr(tx_Q) = *data++;
                 CBUF_AdvancePushIdx(tx_Q);                                              
             }while(--len);
-
-                      
+                     
         }
         
 }
@@ -529,9 +535,6 @@ void usbFunctionWriteOut(uchar *data, uchar len){
 /* Device to host. Endpoint 1 Input */
 void HID_EP_1_IN(){
 
-/*
-    AFAIU, interrupt requests must be exactly 8 bytes long for USB 1.1 .   
-*/
     /* As we don't use EEPROM use the EEAR register as variable */
     EEAR = 0;
 
@@ -543,18 +546,24 @@ void HID_EP_1_IN(){
     }
     interruptBuffer[7] = EEAR;
 
-    /*  The 8th byte holds the serial bytes count if the 
-        receive buffer is empty or the serial count is at 
-        least 7. If the receive buffer is not empty then if 
-        the next byte in the receive buffer is greater than 7 we 
-        added it to the report else wait for the next 
-        interrupt request. This way the receiver can distinguish 
-        if the 8th byte is serial data or serial data count. 
+    /*  The 8th byte ( interruptBuffer[7] ), holds the serial bytes count or
+        is actual serial data, depending on the folowing condition:
+
+        If the next byte value in the buffer is greater than 7
+        then we treated it as serial data and added it to the out 
+        report else the 8th byte holds the serial data count. This
+        way the receiver can distinguish the meaning of the 8th byte
+        if it is serial data or actually the serial data count.                
         
-        Now we losing 1 byte, only in the case, when we filled
-        all the 7 bytes of the report and the next byte
-        in the receive buffer is 7 or smaller. Effectively increased
-        the capability to use 9600 baud reliably. */
+        With this algorithm we can reliably send 700 - 800 bytes per second
+        ( the probability to have 100 7 value at the 8th place of report
+        is very low. So the 700 bytes/s is a very rare worst case scenario ), 
+        if the host controller polls every 10ms as the spec for USB 1.1 says. 
+        But in my tests the host controller or the USB 2.0 hub poll the
+        device every ~8 ms, effectively increasing the amount of bytes to
+        send to 875 - 1000 bytes/s ( again below 970 bytes/s is a rare case )
+        which is enough (more or less) for 9600 Baud ( real speed 960 Bytes/s ).
+    */
         
     if(!(CBUF_IsEmpty(rx_Q)) && (EEAR == 7)){
         uint8_t tmp = CBUF_Get(rx_Q, 0);
@@ -578,7 +587,7 @@ void HID_EP_3_IN(){
     monitorBuffer[5] = 0;
     monitorBuffer[6] = 0;
     monitorBuffer[7] = 0;
-
+ 
     usbSetInterrupt3(monitorBuffer, sizeof(monitorBuffer));
 }
 
