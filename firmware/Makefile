@@ -7,8 +7,8 @@
 # TARGET=atmega8    HFUSE=0xc9  LFUSE=0xef
 # TARGET=atmega48   HFUSE=0xdd  LFUSE=0xff
 # TARGET=at90s2313
-# TARGET ?= atmega8
 TARGET ?= atmega8
+# TARGET ?= atmega88
 # C9 DF = full swing xtal, 4ms SUT
 HFUSE=0xC9
 LFUSE=0xDF
@@ -33,11 +33,11 @@ help:
 	@echo "       TARGET=${TARGET}"
 	@echo "       LFUSE=${LFUSE}"
 	@echo "       HFUSE=${HFUSE}"
-	@echo "       CLOCK=12000000"
+	@echo "       CLOCK=${CLOCK}"
 	@echo "       ISP=${ISP}"
 	@echo "       PORT=${PORT}"
 
-COMPILE = avr-gcc -Wall -Wextra -Os -Iusbdrv -I. -mmcu=$(TARGET) -DF_CPU=$(CLOCK) # -DDEBUG_LEVEL=1
+COMPILE = avr-gcc -Wall -Wextra -fno-move-loop-invariants -fno-tree-scev-cprop -fno-inline-small-functions -Os -Iusbdrv -I. -mmcu=$(TARGET) -DF_CPU=$(CLOCK) # -DDEBUG_LEVEL=1
 
 OBJECTS = usbdrv/usbdrv.o usbdrv/usbdrvasm.o usbdrv/oddebug.o isp.o clock.o tpi.o main.o uart.o
 
@@ -65,6 +65,7 @@ main.bin:	$(OBJECTS)
 main.hex:	main.bin
 	rm -f main.hex main.eep.hex
 	avr-objcopy -j .text -j .data -O ihex main.bin main.hex
+	avr-objcopy -j .eeprom --set-section-flags=.eeprom="alloc,load" --change-section-lma .eeprom=0 -O ihex main.bin main.eep.hex
 #	./checksize main.bin
 # do the checksize script as our last action to allow successful compilation
 # on Windows with WinAVR where the Unix commands will fail.
