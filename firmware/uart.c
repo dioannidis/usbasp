@@ -17,35 +17,27 @@
 #include "uart.h"
 #include "cbuf.h"
 
+volatile uint8_t dataByte;
+
 void __vector_usart_rxc_wrapped() __attribute__ ((signal));
 void __vector_usart_rxc_wrapped(){
     if (!CBUF_IsFull(rx_Q)){
-      *CBUF_GetPushEntryPtr(rx_Q) = EEDR;
+      *CBUF_GetPushEntryPtr(rx_Q) = dataByte;
       CBUF_AdvancePushIdx(rx_Q);
     }
 }
 
-/*
-    As we don't use EEPROM we can use EEDR to store the
-    UDR value. No need to disable RXCIE interrupt. 
-*/
-
 #if (defined __AVR_ATmega8__) || (defined __AVR_ATmega8A__)
 ISR(USART_RXC_vect, ISR_NAKED){
-  __asm__ volatile(
-    "in      __tmp_reg__, %0  \n"
-    "   out     %1, __tmp_reg__  \n"
-    "   rjmp __vector_usart_rxc_wrapped \n"           
-    ::  "i"(_SFR_IO_ADDR(USBASPUART_UDR)),"i"(_SFR_IO_ADDR(EEDR))
 #elif (defined __AVR_ATmega88__) || (defined __AVR_ATmega88PA__)
 ISR(USART_RX_vect, ISR_NAKED){
-  __asm__ volatile(
-    "lds     __tmp_reg__, %0  \n"
-    "   sts     %1, __tmp_reg__  \n"
-    "   rjmp __vector_usart_rxc_wrapped \n"           
-    ::  "m"(USBASPUART_UDR),"m"(EEDR)
 #endif    
-  );
+    __asm__ volatile(
+        "lds     __tmp_reg__, %0  \n"
+        "   sts     %1, __tmp_reg__  \n"
+        "   rjmp __vector_usart_rxc_wrapped \n"
+        ::  "m"(USBASPUART_UDR),"m"(dataByte)
+    );
 }
 
 void __vector_usart_udre_wrapped() __attribute__ ((signal));
