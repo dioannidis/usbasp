@@ -95,6 +95,7 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
 
     DBG1(0xF1, data, 8);
 
+    uchar i;
     usbMsgLen_t len = 0;
 
     /* Device Requests */
@@ -263,6 +264,21 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
                  replyBuffer[3] = 0;
                  len = 4;
 
+            } else if(data[1] == USBASP_FUNC_GETSERIALNUMBER) {
+                replyBuffer[0] = eeprom_read_byte((uint8_t *)&usbDescriptorStringSerialNumber + 2);
+                replyBuffer[1] = eeprom_read_byte((uint8_t *)&usbDescriptorStringSerialNumber + 4);
+                replyBuffer[2] = eeprom_read_byte((uint8_t *)&usbDescriptorStringSerialNumber + 6);
+                replyBuffer[3] = eeprom_read_byte((uint8_t *)&usbDescriptorStringSerialNumber + 8);
+                len = 4;
+
+            } else if(data[1] == USBASP_FUNC_SETSERIALNUMBER) {
+                unsigned tmp = (data[3] << 8) | data[2];
+                for (i=4; i >= 1; i--)
+                    {
+                        eeprom_update_byte(((uint8_t *)&usbDescriptorStringSerialNumber + i*2), 48 + tmp%10);
+                        tmp /= 10;
+                    }
+
             /*  Handle the BOS request associated with the MS Vendor Code
                 we replied earlier in the BOS Descriptor request. See usbFunctionDescriptor. */
             } else if((data[1] == VENDOR_CODE) &&
@@ -300,11 +316,11 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
                             }
                             break;
                         default:
-                        break;
+                            break;
                     }
                     break;
                 default:
-                break;
+                    break;
             }
         }
     }
@@ -430,6 +446,10 @@ uchar usbFunctionWrite(uchar *data, uchar len) {
     if(prog_state == PROG_STATE_SET_REPORT) 
     {
 
+        switch (data[3]) {
+
+           case 0: {
+            
     /*  The first 2 bytes are the uart prescaler ( low byte first then high byte second ) 
         UART settings. The 3rd byte is a bitmask for parity, stop bit and data bit. 
         The 4th byte is reserved for future.
@@ -454,7 +474,22 @@ uchar usbFunctionWrite(uchar *data, uchar len) {
                 featureReport[2] & USBASP_UART_BYTES_MASK
             );
         }
-
+        
+        }
+        break;
+        case 1: {
+                unsigned tmp = (data[1] << 8) | data[0];
+                for (i=4; i >= 1; i--)
+                    {
+                        eeprom_update_byte(((uint8_t *)&usbDescriptorStringSerialNumber + i*2), 48 + tmp%10);
+                        tmp /= 10;
+                    }            
+        }
+        break;
+        default:
+        break;
+        }
+        
         prog_state = PROG_STATE_IDLE;
         
         retVal = 1;
@@ -477,7 +512,7 @@ uchar usbFunctionWrite(uchar *data, uchar len) {
  *  
  *  0x00,0x34,0x00,0x66,0x32,0x36,0x00,0x04 -> Actual serial bytes 4 : 0x00,0x34,0x00,0x66
  *  
- * 0x00,0xC3,0x34,0x55,0x32,0xF3,0x00,0xAB -> Actual serial bytes 8 ( 8th byte > 7 ) : 0x00,0xC3,0x34,0x55,0x32,0xF3,0x00,0xAB
+ *  0x00,0xC3,0x34,0x55,0x32,0xF3,0x00,0xAB -> Actual serial bytes 8 ( 8th byte > 7 ) : 0x00,0xC3,0x34,0x55,0x32,0xF3,0x00,0xAB
  *
  */
 
@@ -535,16 +570,15 @@ void usbFunctionWriteOut(uchar *data, uchar len){
 /* Device to host. Endpoint 1 Input */
 void HID_EP_1_IN(){
 
-    /* As we don't use EEPROM use the EEAR register as variable */
-    EEAR = 0;
-
+    uint8_t count = 0;
+    
     /*  We fill the first 7 bytes of the report from
         the receive buffer if they are exist. */
-    while((!(CBUF_IsEmpty(rx_Q))) && (EEAR != 7)){
-        interruptBuffer[EEAR++] = CBUF_Get(rx_Q, 0);
+    while((!(CBUF_IsEmpty(rx_Q))) && (count != 7)){
+        interruptBuffer[count++] = CBUF_Get(rx_Q, 0);
         CBUF_AdvancePopIdx(rx_Q);
     }
-    interruptBuffer[7] = EEAR;
+    interruptBuffer[7] = count;
 
     /*  The 8th byte ( interruptBuffer[7] ), holds the serial bytes count or
         is actual serial data, depending on the folowing condition:
@@ -565,10 +599,10 @@ void HID_EP_1_IN(){
         which is enough (more or less) for 9600 Baud ( real speed 960 Bytes/s ).
     */
         
-    if(!(CBUF_IsEmpty(rx_Q)) && (EEAR == 7)){
+    if(!(CBUF_IsEmpty(rx_Q)) && (count == 7)){
         uint8_t tmp = CBUF_Get(rx_Q, 0);
-        if(tmp > EEAR) {
-            interruptBuffer[EEAR] = tmp;
+        if(tmp > count) {
+            interruptBuffer[count] = tmp;
             CBUF_AdvancePopIdx(rx_Q);        
         }
     }
