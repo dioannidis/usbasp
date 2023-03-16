@@ -252,8 +252,9 @@ type
         WriteLn();
         WriteLn('USBasp device configuration');
         WriteLn('---------------------------');
-        WriteLn('Crystal : ', crystal);
-        WriteLn('Baud    : ', baud);
+        WriteLn('Serial number : ', USBaspHIDList[USBaspIndex].Serial);
+        WriteLn('Crystal       : ', crystal);
+        WriteLn('Baud          : ', baud);
         WriteLn();
 
         ReceiveRingBuffer := TSPSCRingBuffer.Create(ReceiveBufferSize);
@@ -313,7 +314,7 @@ type
           exit;
         end;
 
-        if SerialNum <> '-1' then
+        if SerialNum <> '' then
         begin
           USBaspIndex := 255;
           for x := 0 to  USBaspHIDList.Count - 1 do
@@ -367,8 +368,9 @@ type
         WriteLn();
         WriteLn('USBasp device configuration');
         WriteLn('---------------------------');
-        WriteLn('Crystal : ', crystal);
-        WriteLn('Baud    : ', baud);
+        WriteLn('Serial number : ', USBaspHIDList[USBaspIndex].Serial);
+        WriteLn('Crystal       : ', crystal);
+        WriteLn('Baud          : ', baud);
         WriteLn();
 
 
