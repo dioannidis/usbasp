@@ -36,8 +36,6 @@ uses
 
 type
 
-  PUSBaspHIDDevice = ^TUSBaspHIDDevice;
-
   TUSBaspHIDDevice = record
     HidDevice: PHidDevice;
     index: byte;
@@ -53,8 +51,19 @@ type
     ReportSize: word;
     PacketCount: byte;
   end;
+  PUSBaspHIDDevice = ^TUSBaspHIDDevice;
 
-  TUSBaspHIDDeviceList = specialize TFPGList<PUSBaspHIDDevice>;
+  { TUSBaspHIDDeviceList }
+
+  TUSBaspHIDDeviceList = class(TFPList)
+  private
+    function Get(Index: integer): PUSBaspHIDDevice;
+  public
+    destructor Destroy; override;
+    function Add(Value: PUSBaspHIDDevice): integer;
+    procedure FreeItems;
+    property Items[Index: integer]: PUSBaspHIDDevice read Get; default;
+  end;
 
 procedure usbasp_enumerate(const APrintInfo: boolean = False);
 procedure usbasp_open(const AUSBaspHIDDevice: PUSBaspHIDDevice);
@@ -63,6 +72,7 @@ function usbasp_read(const AUSBaspHIDDevice: PUSBaspHIDDevice; var Data): intege
 function usbasp_write(const AUSBaspHIDDevice: PUSBaspHIDDevice; var Data): integer;
 function usbasp_uart_set_conf(const AUSBaspHIDDevice: PUSBaspHIDDevice; var Data): integer;
 function usbasp_uart_get_conf(const AUSBaspHIDDevice: PUSBaspHIDDevice; var Data): integer;
+function usbasp_uart_write_serial(const AUSBaspHIDDevice: PUSBaspHIDDevice; const ASerialNumber: String): integer;
 
 var
   USBaspHIDList: TUSBaspHIDDeviceList;
@@ -81,6 +91,8 @@ var
   USBaspHIDDevice: PUSBaspHIDDevice;
   index: byte;
 begin
+  AUSBaspHIDDeviceList.FreeItems;
+  AUSBaspHIDDeviceList.Clear;
   try
     HidEnumerateList := THidDeviceInfo.Enumerate($16C0, $05DC);
     HidItem := HidEnumerateList;
@@ -114,13 +126,17 @@ end;
 
 procedure PrintInfo(const AUSBaspHIDDevice: PUSBaspHIDDevice);
 begin
+  WriteLn('-----------');
+  WriteLn('USBasp List index : ', AUSBaspHIDDevice^.index);
   WriteLn();
-  WriteLn('Index            : ', AUSBaspHIDDevice^.index);
-  WriteLn('USB Path         : ', AUSBaspHIDDevice^.Path);
-  WriteLn('Vendor           : ', AUSBaspHIDDevice^.Manufacturer);
-  WriteLn('Product          : ', AUSBaspHIDDevice^.Product);
-  WriteLn('Serial           : ', AUSBaspHIDDevice^.Serial);
-  WriteLn('Firmware Version : ', AUSBaspHIDDevice^.FirmwareVersion);
+  WriteLn('Type : ', AUSBaspHIDDevice^.VendorID.ToHexString, ' ', AUSBaspHIDDevice^.ProductID.ToHexString);
+  WriteLn('Path : ', AUSBaspHIDDevice^.Path);
+  WriteLn('Serial number : ', AUSBaspHIDDevice^.Serial);
+  WriteLn('Manufacturer  : ', AUSBaspHIDDevice^.Manufacturer);
+  WriteLn('Product       : ', AUSBaspHIDDevice^.Product);
+  WriteLn('Release       : ', AUSBaspHIDDevice^.FirmwareVersion);
+  WriteLn('Interface     : ', AUSBaspHIDDevice^.InterfaceNumber);
+  WriteLn();
 end;
 
 procedure usbasp_enumerate(const APrintInfo: boolean);
@@ -195,6 +211,30 @@ begin
   Result := HidSize - 1;
 end;
 
+function usbasp_uart_write_serial(const AUSBaspHIDDevice: PUSBaspHIDDevice;
+  const ASerialNumber: String): integer;
+var
+  HidBuffer: array[0..8] of byte = (0, 0, 0, 0, 0, 0, 0, 0, 0);
+  HidSize: SizeInt;
+  ErrorCode: integer;
+  SerNumValue: Word;
+begin
+  Val(ASerialNumber, SerNumValue, ErrorCode);
+
+  // Add Report ID
+  HidBuffer[0] := $00;
+
+  HidBuffer[1] := lo(SerNumValue);
+  HidBuffer[2] := Hi(SerNumValue);
+
+  HidBuffer[4] := $01;
+
+  // Report size plus added Report ID
+  HidSize := AUSBaspHIDDevice^.HidDevice^.SendFeatureReport(HidBuffer, AUSBaspHIDDevice^.ReportSize + 1);
+
+  Result := HidSize;
+end;
+
 function usbasp_uart_set_conf(const AUSBaspHIDDevice: PUSBaspHIDDevice; var Data): integer;
 var
   HidBuffer: array[0..8] of byte = (0, 0, 0, 0, 0, 0, 0, 0, 0);
@@ -212,17 +252,37 @@ begin
   Result := HidSize;
 end;
 
+{ TUSBaspHIDDeviceList }
+
+function TUSBaspHIDDeviceList.Get(Index: integer): PUSBaspHIDDevice;
+begin
+  Result := PUSBaspHIDDevice(inherited Get(Index));
+end;
+
+destructor TUSBaspHIDDeviceList.Destroy;
+begin
+  FreeItems;
+  inherited Destroy;
+end;
+
+function TUSBaspHIDDeviceList.Add(Value: PUSBaspHIDDevice): integer;
+begin
+  Result := inherited Add(Value);
+end;
+
+procedure TUSBaspHIDDeviceList.FreeItems;
+var
+  i: integer;
+begin
+  for i := 0 to Count - 1 do
+    Dispose(Items[i]);
+end;
+
 initialization
   HidInit();
   USBaspHIDList := TUSBaspHIDDeviceList.Create;
 
 finalization;
-  i := USBaspHIDList.Count - 1;
-  while i >= 0 do
-  begin
-    Dispose(USBaspHIDList[i]);
-    Dec(i);
-  end;
   USBaspHIDList.Free;
   HidExit();
 

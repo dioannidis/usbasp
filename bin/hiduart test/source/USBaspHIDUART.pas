@@ -45,11 +45,27 @@ type
   TUSBaspHIDUARTTest = class(TCustomApplication)
   protected
     procedure DoRun; override;
+    procedure PrintHidInfo(const AUSBaspHIDDevice: PUSBaspHIDDevice);
   public
     constructor Create(TheOwner: TComponent); override;
     destructor Destroy; override;
     procedure WriteHelp; virtual;
   end;
+
+  procedure TUSBaspHIDUARTTest.PrintHidInfo(const AUSBaspHIDDevice: PUSBaspHIDDevice);
+  begin
+    WriteLn('-----------');
+    WriteLn('USBasp List index : ', AUSBaspHIDDevice^.index);
+    WriteLn();
+    WriteLn('Type : ', AUSBaspHIDDevice^.VendorID.ToHexString, ' ', AUSBaspHIDDevice^.ProductID.ToHexString);
+    WriteLn('Path : ', AUSBaspHIDDevice^.Path);
+    WriteLn('Serial number : ', AUSBaspHIDDevice^.Serial);
+    WriteLn('Manufacturer  : ', AUSBaspHIDDevice^.Manufacturer);
+    WriteLn('Product       : ', AUSBaspHIDDevice^.Product);
+    WriteLn('Release       : ', AUSBaspHIDDevice^.FirmwareVersion);
+    WriteLn('Interface     : ', AUSBaspHIDDevice^.InterfaceNumber);
+  end;
+
 
   procedure TUSBaspHIDUARTTest.DoRun;
   const
@@ -63,6 +79,7 @@ type
     prescaler: word;
     BreakLoop, Sending: boolean;
     baud: integer = 9600;
+    SerialNum: string = '';
     USBaspIndex: byte = 0;
     crystal: integer = 12000000;
     InputString: string;
@@ -74,8 +91,8 @@ type
 
   begin
     // quick check parameters
-    ErrorMsg := CheckOptions('h,l,r,w,i,b,c', ['help', 'list',
-      'read-input', 'send-output', 'index', 'baud', 'crystal']);
+    ErrorMsg := CheckOptions('h,l,r,w,i,b,c,s,u', ['help', 'list',
+      'read-input', 'send-output', 'index', 'baud', 'crystal', 'serial', 'update-serial']);
     if ErrorMsg <> '' then
     begin
       ShowException(Exception.Create(ErrorMsg));
@@ -94,7 +111,6 @@ type
     if HasOption('l', 'list') then
     begin
       usbasp_enumerate(True);
-      ReadLn;
       Terminate;
       Exit;
     end;
@@ -114,6 +130,58 @@ type
       baud := StrToInt(GetOptionValue('b', 'baud'));
     end;
 
+    if HasOption('s', 'serial') then
+    begin
+      SerialNum := GetOptionValue('s', 'serial');
+      if SerialNum.Length > 4 then
+        SerialNum := SerialNum.Substring(0, 4);
+    end;
+
+    if HasOption('u', 'update-serial') then
+    begin
+      usbasp_enumerate(False);
+
+      if (USBaspHIDList.Count > 0) then
+      begin
+
+        SerialNum := GetOptionValue('u', 'update-serial');
+        if SerialNum.Length > 4 then
+          SerialNum := SerialNum.Substring(0, 4);
+
+        if (HasOption('i', 'index')) and (USBaspIndex > USBaspHIDList.Count - 1) then
+        begin
+          WriteLn();
+          WriteLn('ERROR : There is no USBasp HID UART with index ', USBaspIndex);
+          terminate;
+          exit;
+        end;
+
+        if USBaspHIDList[USBaspIndex].HidDevice <> nil then
+          usbasp_open(USBaspHIDList[USBaspIndex])
+        else
+        begin
+          WriteLn();
+          WriteLn('ERROR : Cannot open USBasp HID UART with index ', USBaspIndex);
+          terminate;
+          exit;
+        end;
+
+        PrintHidInfo(USBaspHIDList[USBaspIndex]);
+
+        WriteLn();
+        WriteLn('Updating USBasp Serial Number ... ');
+        usbasp_uart_write_serial(USBaspHIDList[USBaspIndex], SerialNum);
+
+        usbasp_close(USBaspHIDList[USBaspIndex]);
+
+        usbasp_enumerate(False);
+        PrintHidInfo(USBaspHIDList[USBaspIndex]);
+
+      end;
+      Terminate;
+      Exit;
+    end;
+
     if HasOption('r', 'read-input') then
     begin
       usbasp_enumerate(False);
@@ -127,6 +195,23 @@ type
           WriteLn('ERROR : There is no USBasp HID UART with index ', USBaspIndex);
           terminate;
           exit;
+        end;
+
+        if SerialNum <> '' then
+        begin
+          USBaspIndex := 255;
+          for x := 0 to  USBaspHIDList.Count - 1 do
+            if USBaspHIDList[x].Serial = SerialNum then
+            begin
+              USBaspIndex := USBaspHIDList[x].index;
+              Break;
+            end;
+          If USBaspIndex = 255 then
+          begin
+            WriteLn('ERROR : Cannot open USBasp HID UART with serial ', SerialNum);
+            terminate;
+            exit;
+          end;
         end;
 
         if USBaspHIDList[USBaspIndex].HidDevice <> nil then
@@ -226,6 +311,23 @@ type
           WriteLn('ERROR : There is no USBasp HID UART with index ', USBaspIndex);
           terminate;
           exit;
+        end;
+
+        if SerialNum <> '-1' then
+        begin
+          USBaspIndex := 255;
+          for x := 0 to  USBaspHIDList.Count - 1 do
+            if USBaspHIDList[x].Serial = SerialNum then
+            begin
+              USBaspIndex := USBaspHIDList[x].index;
+              Break;
+            end;
+          If USBaspIndex = 255 then
+          begin
+            WriteLn('ERROR : Cannot open USBasp HID UART with serial ', SerialNum);
+            terminate;
+            exit;
+          end;
         end;
 
         if USBaspHIDList[USBaspIndex].HidDevice <> nil then
@@ -354,6 +456,10 @@ type
     writeln(' -i  Select USBasp index ( default 0 )');
     writeln(' -b  Set Baud ( default 9600 )');
     writeln(' -c  Set Crystal Hz ( default 12 MHz or 12000000 Hz )');
+    writeln(' -s  Select USBasp with serial number.');
+    writeln('     4 Digits numeric only i.e. 3456, 2222, etc ).');
+    writeln(' -u  Serial Number to update ( 4 Digits numeric only i.e. 3456, 2222, etc ).');
+    writeln('     Use with index -i when more than one USBasp are connected.');
     writeln(' -r  Continuous read input');
     writeln(' -w  Interactive send output');
     writeln();
@@ -365,8 +471,20 @@ type
     writeln('Interactive write to USBasp at index 1 with 9600 baud');
     writeln(' USBaspHIDUART -i 1 -w');
     writeln();
+    writeln('Interactive write to USBasp with serial number 1111 with 9600 baud');
+    writeln(' USBaspHIDUART -s 1111 -w');
+    writeln();
     writeln('Read from USBasp at index 1 with 19200 baud from a device with 20 MHz crystal');
     writeln(' USBaspHIDUART -i 1 -b 19200 -c 20000000 -r');
+    writeln();
+    writeln('Read from USBasp with serial number 2345 with 19200 baud from a device with 20 MHz crystal');
+    writeln(' USBaspHIDUART -s 2345 -b 19200 -c 20000000 -r');
+    writeln();
+    writeln('Update the first found USBasp''s serial number with 3456');
+    writeln(' USBaspHIDUART -u 3456');
+    writeln();
+    writeln('Update the USBasp''s at index 3 serial number with 3456');
+    writeln(' USBaspHIDUART -i 3 -u 3456');
   end;
 
 var
