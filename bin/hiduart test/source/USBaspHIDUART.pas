@@ -469,7 +469,7 @@ type
     writeln(' -l  List USBasp HID devices');
     writeln(' -i  Select USBasp index ( default 0 )');
     writeln(' -b  Set Baud ( default 9600 )');
-    writeln(' -c  Set Crystal Hz ( default 12 MHz or 12000000 Hz )');
+    writeln(' -c  Set USBasp Crystal Hz ( default 12 MHz or 12000000 Hz )');
     writeln(' -s  Select USBasp with serial number.');
     writeln('     4 Digits numeric only i.e. 3456, 2222, etc ).');
     writeln(' -u  Serial Number to update ( 4 Digits numeric only i.e. 3456, 2222, etc ).');
@@ -488,10 +488,10 @@ type
     writeln('Interactive write to USBasp with serial number 1111 with 9600 baud');
     writeln(' USBaspHIDUART -s 1111 -w');
     writeln();
-    writeln('Read from USBasp at index 1 with 19200 baud from a device with 20 MHz crystal');
+    writeln('Read from USBasp with 20 MHz crystal at index 1 with 19200 baud');
     writeln(' USBaspHIDUART -i 1 -b 19200 -c 20000000 -r');
     writeln();
-    writeln('Read from USBasp with serial number 2345 with 19200 baud from a device with 20 MHz crystal');
+    writeln('Read from USBasp with 20 MHz crystal and with serial number 2345 with 19200 baud');
     writeln(' USBaspHIDUART -s 2345 -b 19200 -c 20000000 -r');
     writeln();
     writeln('Update the first found USBasp''s serial number with 3456');
