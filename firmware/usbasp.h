@@ -30,8 +30,6 @@
 #define USBASP_FUNC_TPI_RAWWRITE        14
 #define USBASP_FUNC_TPI_READBLOCK       15
 #define USBASP_FUNC_TPI_WRITEBLOCK      16
-#define USBASP_FUNC_SETSERIALNUMBER     125
-#define USBASP_FUNC_GETSERIALNUMBER     126
 #define USBASP_FUNC_GETCAPABILITIES     127
 // UART:
 #define USBASP_FUNC_UART_CONFIG         60
@@ -41,6 +39,7 @@
 #define USBASP_CAP_0_TPI                0x01
 #define USBASP_CAP_6_UART               0x40
 #define USBASP_CAP_HIDUART              0x80
+#define USBASP_CAP_SNHIDUPDATE          0x20
 
 #define USBASP_CAP_12MHZ_CLOCK          0x00
 #define USBASP_CAP_16MHZ_CLOCK          0x01

@@ -29,12 +29,14 @@
 #include "tpi.h"
 #include "tpi_defs.h"
 
+const uint8_t EEMEM serialNumberEepromCheck = 0x80;
+
 static uchar featureReport[8] = {
     0,                                             /* Prescaler Low byte */
     0,                                             /* Prescaler High byte */
     0,                                             /* Bitmask Parity, StopBit and DataBit */
     0,                                             /* Reserved */
-    USBASP_CAP_0_TPI | USBASP_CAP_HIDUART,         /* Device Capabilities */
+    USBASP_CAP_0_TPI | USBASP_CAP_HIDUART | USBASP_CAP_SNHIDUPDATE,         /* Device Capabilities */
 #if F_CPU == 12000000L
     USBASP_CAP_12MHZ_CLOCK,                        /* Device Crystal      */
 #elif F_CPU == 16000000L                           
@@ -95,7 +97,6 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
 
     DBG1(0xF1, data, 8);
 
-    uchar i;
     usbMsgLen_t len = 0;
 
     /* Device Requests */
@@ -263,21 +264,6 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
                  replyBuffer[2] = 0;
                  replyBuffer[3] = 0;
                  len = 4;
-
-            } else if(data[1] == USBASP_FUNC_GETSERIALNUMBER) {
-                replyBuffer[0] = eeprom_read_byte((uint8_t *)&usbDescriptorStringSerialNumber + 2);
-                replyBuffer[1] = eeprom_read_byte((uint8_t *)&usbDescriptorStringSerialNumber + 4);
-                replyBuffer[2] = eeprom_read_byte((uint8_t *)&usbDescriptorStringSerialNumber + 6);
-                replyBuffer[3] = eeprom_read_byte((uint8_t *)&usbDescriptorStringSerialNumber + 8);
-                len = 4;
-
-            } else if(data[1] == USBASP_FUNC_SETSERIALNUMBER) {
-                unsigned tmp = (data[3] << 8) | data[2];
-                for (i=4; i >= 1; i--)
-                    {
-                        eeprom_update_byte(((uint8_t *)&usbDescriptorStringSerialNumber + i*2), 48 + tmp%10);
-                        tmp /= 10;
-                    }
 
             /*  Handle the BOS request associated with the MS Vendor Code
                 we replied earlier in the BOS Descriptor request. See usbFunctionDescriptor. */
@@ -632,6 +618,21 @@ int main(void) {
 
     /* init timer */
     clockInit();
+    
+    if(eeprom_read_byte((uint8_t *)&serialNumberEepromCheck) != 0x80) {
+      eeprom_update_byte((uint8_t *)&serialNumberEepromCheck, 0x80);
+
+      eeprom_update_byte(((uint8_t *)&usbDescriptorStringSerialNumber), 0x0A);
+      eeprom_update_byte(((uint8_t *)&usbDescriptorStringSerialNumber + 1), 0x03);
+      eeprom_update_byte(((uint8_t *)&usbDescriptorStringSerialNumber + 2), '0');
+      eeprom_update_byte(((uint8_t *)&usbDescriptorStringSerialNumber + 3), 0);
+      eeprom_update_byte(((uint8_t *)&usbDescriptorStringSerialNumber + 4), '0');
+      eeprom_update_byte(((uint8_t *)&usbDescriptorStringSerialNumber + 5), 0);
+      eeprom_update_byte(((uint8_t *)&usbDescriptorStringSerialNumber + 6), '0');
+      eeprom_update_byte(((uint8_t *)&usbDescriptorStringSerialNumber + 7), 0);
+      eeprom_update_byte(((uint8_t *)&usbDescriptorStringSerialNumber + 8), '0');
+      eeprom_update_byte(((uint8_t *)&usbDescriptorStringSerialNumber + 9), 0);
+    }
 
     /* output SE0 for USB reset */
     DDRB = ~0;
