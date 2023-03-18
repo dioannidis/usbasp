@@ -29,8 +29,6 @@
 #include "tpi.h"
 #include "tpi_defs.h"
 
-const uint8_t EEMEM serialNumberEepromCheck = 0x80;
-
 static uchar featureReport[8] = {
     0,                                             /* Prescaler Low byte */
     0,                                             /* Prescaler High byte */
@@ -619,21 +617,6 @@ int main(void) {
     /* init timer */
     clockInit();
     
-    if(eeprom_read_byte((uint8_t *)&serialNumberEepromCheck) != 0x80) {
-      eeprom_update_byte((uint8_t *)&serialNumberEepromCheck, 0x80);
-
-      eeprom_update_byte(((uint8_t *)&usbDescriptorStringSerialNumber), 0x0A);
-      eeprom_update_byte(((uint8_t *)&usbDescriptorStringSerialNumber + 1), 0x03);
-      eeprom_update_byte(((uint8_t *)&usbDescriptorStringSerialNumber + 2), '0');
-      eeprom_update_byte(((uint8_t *)&usbDescriptorStringSerialNumber + 3), 0);
-      eeprom_update_byte(((uint8_t *)&usbDescriptorStringSerialNumber + 4), '0');
-      eeprom_update_byte(((uint8_t *)&usbDescriptorStringSerialNumber + 5), 0);
-      eeprom_update_byte(((uint8_t *)&usbDescriptorStringSerialNumber + 6), '0');
-      eeprom_update_byte(((uint8_t *)&usbDescriptorStringSerialNumber + 7), 0);
-      eeprom_update_byte(((uint8_t *)&usbDescriptorStringSerialNumber + 8), '0');
-      eeprom_update_byte(((uint8_t *)&usbDescriptorStringSerialNumber + 9), 0);
-    }
-
     /* output SE0 for USB reset */
     DDRB = ~0;
     clockWait(10 / 0.320);              /* 10ms */
