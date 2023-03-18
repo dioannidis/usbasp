@@ -168,9 +168,21 @@ type
 
         PrintHidInfo(USBaspHIDList[USBaspIndex]);
 
-        WriteLn();
-        WriteLn('Updating USBasp Serial Number ... ');
-        usbasp_uart_write_serial(USBaspHIDList[USBaspIndex], SerialNum);
+        usbasp_uart_get_conf(USBaspHIDList[USBaspIndex], HidPacketBuffer);
+        if (HidPacketBuffer[4] and $20) <> $20 then
+        begin
+          WriteLn();
+          WriteLn('USBasp does not support Serial Number update ! ');
+        end
+        else
+        begin
+          WriteLn();
+          WriteLn();
+          Write('Updating USBasp Serial Number ... ');
+          usbasp_uart_write_serial(USBaspHIDList[USBaspIndex], SerialNum);
+          WriteLn('Done .');
+          WriteLn();
+        end;
 
         usbasp_close(USBaspHIDList[USBaspIndex]);
 
