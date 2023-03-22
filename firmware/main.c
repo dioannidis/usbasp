@@ -4,19 +4,20 @@
  * Thomas Fischl <tfischl@gmx.de>
  * 2020 fixes and tweaks by Ralph Doncaster (Nerd Ralph)
  * 2021 WCID support by Dimitrios Chr. Ioannidis ( d.ioannidis@nephelae.eu )
-  *     ( based on Marius Greuel's https://github.com/mariusgreuel/USBasp )
+ *      ( based on Marius Greuel's https://github.com/mariusgreuel/USBasp )
  * 2022 Composite WCID and HID by Dimitrios Chr. Ioannidis ( d.ioannidis@nephelae.eu )
+ * 2023 Serial Number write via HID and 
+ *      descriptors stored in EEPROM by Dimitrios Chr. Ioannidis ( d.ioannidis@nephelae.eu )
  *
  * License........: GNU GPL v2 (see Readme.txt)
  * Target.........: ATMega8 at 12 MHz
  * Creation Date..: 2005-02-20
- * Last change....: 2020-11-26
+ * Last change....: 2023-03-22
  *
  */
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
-//#include <avr/pgmspace.h>
 #include <avr/wdt.h>
 
 #include "oddebug.h"
@@ -433,49 +434,48 @@ uchar usbFunctionWrite(uchar *data, uchar len) {
         switch (data[3]) {
 
            case 0: {
-            
+
     /*  The first 2 bytes are the uart prescaler ( low byte first then high byte second ) 
         UART settings. The 3rd byte is a bitmask for parity, stop bit and data bit. 
         The 4th byte is reserved for future.
             
         The last 4 bytes are the USBasp capabilities which are readonly. */
-            
-        featureReport[0] = data[0];
-        featureReport[1] = data[1];
-        featureReport[2] = data[2];
 
-        uart_disable();
-        
+                featureReport[0] = data[0];
+                featureReport[1] = data[1];
+                featureReport[2] = data[2];
+
+                uart_disable();
+
     /*  To enable the UARTT the baud needs to be non zero. 
         Meaning that to disable the UART communication send a set feature report 
         with the prescaler ( first 2 bytes ) zeroed. */
         
-        if ((featureReport[1]<<8)|featureReport[0]) {
-            uart_config(
-                (featureReport[1]<<8)|featureReport[0], 
-                featureReport[2] & USBASP_UART_PARITY_MASK, 
-                featureReport[2] & USBASP_UART_STOP_MASK, 
-                featureReport[2] & USBASP_UART_BYTES_MASK
-            );
-        }
-        
-        }
-        break;
-        case 1: {
+                if ((featureReport[1]<<8)|featureReport[0]) {
+                    uart_config(
+                        (featureReport[1]<<8)|featureReport[0], 
+                        featureReport[2] & USBASP_UART_PARITY_MASK, 
+                        featureReport[2] & USBASP_UART_STOP_MASK, 
+                        featureReport[2] & USBASP_UART_BYTES_MASK
+                    );
+                }
+            }
+                break;
+            case 1: {
                 unsigned tmp = (data[1] << 8) | data[0];
                 for (i=4; i >= 1; i--)
                     {
                         eeprom_update_byte(((uint8_t *)&usbDescriptorStringSerialNumber + i*2), 48 + tmp%10);
                         tmp /= 10;
-                    }            
+                    }
+                }
+                break;
+            default:
+                break;
         }
-        break;
-        default:
-        break;
-        }
-        
+
         prog_state = PROG_STATE_IDLE;
-        
+
         retVal = 1;
     }
 
@@ -597,14 +597,14 @@ void HID_EP_1_IN(){
 /* Device to host. Endpoint 2 Input */
 void HID_EP_3_IN(){
 
-    monitorBuffer[0] = prog_state;
+    monitorBuffer[0] = 0;
     monitorBuffer[1] = 0;
     monitorBuffer[2] = 0;
     monitorBuffer[3] = 0;
     monitorBuffer[4] = 0;
     monitorBuffer[5] = 0;
     monitorBuffer[6] = 0;
-    monitorBuffer[7] = 0;
+    monitorBuffer[7] = prog_state;
  
     usbSetInterrupt3(monitorBuffer, sizeof(monitorBuffer));
 }
