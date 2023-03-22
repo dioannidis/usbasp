@@ -5,7 +5,7 @@ program USBaspHIDUART;
   This file is part of
     Nephelae USBasp HID UART.
 
-  Copyright (C) 2022 Dimitrios Chr. Ioannidis.
+  Copyright (C) 2022 - 2023 Dimitrios Chr. Ioannidis.
     Nephelae - https://www.nephelae.eu
 
   https://www.nephelae.eu/
