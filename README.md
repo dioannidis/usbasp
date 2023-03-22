@@ -8,6 +8,7 @@ This USBasp firmware is based on [a fork by Ralph Doncaster]. Original fork read
 - From version 1.08 the firmware is [WCID] compliant, meaning it should work on Windows without any driver or .inf install.
 - From version 1.09 a ( reliable at 9600 Baud, with 120ms - 160ms intervals for higher speeds see note at UART HID protocol ) UART HID implementation is added for debugging purposes. USBasp will appear as a composite device with a WINUSB interface and a HID interface.
 - From version 1.10 USBasp WCID switch to Microsoft OS 2.0 Descriptors. It seems that it play better with USB 3.0 ports.
+- (DEV)From version x.xx USBasp supports updating it's serial number ( see USBaspHIDUART utility ).
 
 > Note: A pre-built hex file for the mega8 (main.hex) is in the firmware directory, along with m88.hex for the mega88. Build with [MSYS2] and [avr8-gnu-toolchain (3.6.2.17778)] from Microchip, on a Windows 10 box.
 
@@ -72,7 +73,11 @@ USBasp HIDUART Test App
  -l  List USBasp HID devices
  -i  Select USBasp index ( default 0 )
  -b  Set Baud ( default 9600 )
- -c  Set Crystal Hz ( default 12 MHz or 12000000 Hz )
+ -c  Set USBasp Crystal Hz ( default 12 MHz or 12000000 Hz )
+ -s  Select USBasp with serial number.
+     4 Digits numeric only i.e. 3456, 2222, etc ).
+ -u  Serial Number to update ( 4 Digits numeric only i.e. 3456, 2222, etc ).
+     Use with index -i when more than one USBasp are connected.
  -r  Continuous read input
  -w  Interactive send output
 
@@ -84,8 +89,20 @@ Read from USBasp at index 0 with 4800 baud
 Interactive write to USBasp at index 1 with 9600 baud
  USBaspHIDUART -i 1 -w
 
-Read from USBasp at index 1 with 19200 baud from a device with 20 MHz crystal
+Interactive write to USBasp with serial number 1111 with 9600 baud
+ USBaspHIDUART -s 1111 -w
+
+Read from USBasp with 20 MHz crystal at index 1 with 19200 baud
  USBaspHIDUART -i 1 -b 19200 -c 20000000 -r
+
+Read from USBasp with 20 MHz crystal and with serial number 2345 with 19200 baud
+ USBaspHIDUART -s 2345 -b 19200 -c 20000000 -r
+
+Update the first found USBasp's serial number with 3456
+ USBaspHIDUART -u 3456
+
+Update the USBasp's at index 3 serial number with 3456
+ USBaspHIDUART -i 3 -u 3456
 ```
 
 
