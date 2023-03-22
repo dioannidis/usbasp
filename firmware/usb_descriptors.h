@@ -3,6 +3,7 @@
  * 2018 WCID support by Marius Greuel ( https://github.com/mariusgreuel )
  * 2022 Composite WCID and HID by Dimitrios Chr. Ioannidis ( d.ioannidis@nephelae.eu )
  * 2022 Move to Microsoft OS 2.0 Descriptors by Dimitrios Chr. Ioannidis ( d.ioannidis@nephelae.eu )
+ * 2023 Store Serial Number to EEPROM by Dimitrios Chr. Ioannidis ( d.ioannidis@nephelae.eu )
  *
  * Tabsize: 4
  * License: GNU GPL v2 (see Readme.txt)
@@ -162,14 +163,6 @@ PROGMEM const char BOS_DESCRIPTOR[] = {
     USBDESCR_BOS,                                          /* Descriptor type */
     0x21, 0x00,                                            /* Length of this descriptor and all of its sub descriptors */
     0x01,                                                  /* The number of separate device capability descriptors in the BOS */
-
-    // /* Device Capability Descriptor - Container_ID */
-    // 0x14,                                                  /* Size of descriptor */
-    // USBDESCR_DEVICE_CAPABILITY_TYPE,                       /* Descriptor Type */
-    // USBDESCR_DEVICE_CAPABILITY_CONTAINER_ID,               /* Device Capability Type */
-    // 0x00,                                                  /* Reserved */
-    // 0xB9, 0xD3, 0x57, 0xAD, 0x66, 0x11, 0xF8, 0x43,        /* UUID */
-    // 0x88, 0x90, 0xEB, 0xE1, 0x4D, 0xDC, 0x75, 0x94,        /* {AD57D3B9-1166-43F8-8790-EBE14DDC7594} */
 
     /* Device Capability Descriptor - Platform */
     0x1C,                                                  /* Length */

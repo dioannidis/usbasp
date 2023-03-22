@@ -45,16 +45,14 @@ void __vector_usart_udre_wrapped(){
     
     if(!CBUF_IsEmpty(tx_Q)){
         USBASPUART_UDR=*CBUF_GetPopEntryPtr(tx_Q);
-        CBUF_AdvancePopIdx(tx_Q);        
+        CBUF_AdvancePopIdx(tx_Q);
     } else {
         USBASPUART_UCSRB &= ~(1<<USBASPUART_UDRIE);
     }
-    
+
 }
 
-// This cannot be ISR_NOBLOCK, since UDRE is level sensitive.
-// Therefore, we clear the interrupt manually and then jump
-// into the real handler. USB interrupt delay is about 3 clocks.
+
 ISR(USART_UDRE_vect, ISR_NAKED){
   __asm__ volatile(
     "rjmp __vector_usart_udre_wrapped    \n"
@@ -63,21 +61,21 @@ ISR(USART_UDRE_vect, ISR_NAKED){
 }
 
 void uart_disable(){
-    
+
     /* Switch Rx Pullup off */
     PORTD &= ~(1 << PIND0);
-    
+
     USBASPUART_UCSRB = 0;
     USBASPUART_UCSRB &= ~(1<<USBASPUART_UDRIE);
 
     CBUF_Init(tx_Q);
     CBUF_Init(rx_Q);
-   
-    
+
+
     if(usbAllRequestsAreDisabled()){
         usbEnableAllRequests();
     }
-    
+
 }
 
 void uart_config(uint16_t baud, uint8_t par, uint8_t stop, uint8_t bytes){
@@ -118,7 +116,7 @@ void uart_config(uint16_t baud, uint8_t par, uint8_t stop, uint8_t bytes){
     // Turn on RX/TX and RX interrupt.
     USBASPUART_UCSRB=(1<<USBASPUART_RXCIE)|(1<<USBASPUART_RXEN)|(1<<USBASPUART_TXEN);
     
-  	/* Enable Rx Pin Pullup */
-	PORTD |= (1 << PIND0);
+    /* Enable Rx Pin Pullup */
+    PORTD |= (1 << PIND0);
 
 }

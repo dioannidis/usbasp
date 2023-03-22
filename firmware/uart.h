@@ -31,10 +31,10 @@
 #   define USBASPUART_UPM1      UPM1
 #   define USBASPUART_USBS      USBS
 #   define USBASPUART_UBRRL     UBRRL
-#   define USBASPUART_UBRRH     UBRRH      
-#   define USBASPUART_RXCIE     RXCIE      
-#   define USBASPUART_RXEN      RXEN      
-#   define USBASPUART_TXEN      TXEN      
+#   define USBASPUART_UBRRH     UBRRH
+#   define USBASPUART_RXCIE     RXCIE
+#   define USBASPUART_RXEN      RXEN
+#   define USBASPUART_TXEN      TXEN
 
 #elif (defined __AVR_ATmega88__) || (defined __AVR_ATmega88PA__)
     
@@ -51,10 +51,10 @@
 #   define USBASPUART_UPM1      UPM01
 #   define USBASPUART_USBS      USBS0
 #   define USBASPUART_UBRRL     UBRR0L
-#   define USBASPUART_UBRRH     UBRR0H      
+#   define USBASPUART_UBRRH     UBRR0H
 #   define USBASPUART_RXCIE     RXCIE0
-#   define USBASPUART_RXEN      RXEN0    
-#   define USBASPUART_TXEN      TXEN0     
+#   define USBASPUART_RXEN      RXEN0
+#   define USBASPUART_TXEN      TXEN0
 
 #endif    
 
