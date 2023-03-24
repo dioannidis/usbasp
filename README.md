@@ -8,13 +8,11 @@ This USBasp firmware is based on [a fork by Ralph Doncaster]. Original fork read
 - From version 1.08 the firmware is [WCID] compliant, meaning it should work on Windows without any driver or .inf install.
 - From version 1.09 a ( reliable at 9600 Baud, with 120ms - 160ms intervals for higher speeds see note at UART HID protocol ) UART HID implementation is added for debugging purposes. USBasp will appear as a composite device with a WINUSB interface and a HID interface.
 - From version 1.10 USBasp WCID switch to Microsoft OS 2.0 Descriptors. It seems that it play better with USB 3.0 ports.
-- (DEV)From version x.xx USBasp supports updating it's serial number ( see [USBaspHIDUART utility] ).
-
-> Note: A pre-built hex file for the mega8 (main.hex) is in the firmware directory, along with m88.hex for the mega88. Build with [MSYS2] and [avr8-gnu-toolchain (3.6.2.17778)] from Microchip, on a Windows 10 box.
+- From version 1.11 USBasp supports updating it's serial number ( see [USBaspHIDUART utility] ).
 
 ### Avrdude
 
-Pre-built avrdude 6.3 and 6.4, windows executables, if needed, is in the bin\avrdude-winusb directory. For avrdude v7 the official windows binary from [avrdudes/avrdude] uses libwinusb instead of libusb, which doesn't support composite devices as this firmware implements. Please use the unofficial build using mingw64 ( avrdude-v7.1-mingw64 ) from [mcuee] repo.
+ Avrdude v7+ official windows binary from [avrdudes/avrdude] uses libwinusb instead of libusb, which doesn't support composite devices as this firmware implements. Please use the unofficial build using mingw64 ( avrdude-v7.1-mingw64 ) from [mcuee] repo.
 
 ### UART GUI Client
 
@@ -59,8 +57,6 @@ To disable the UART, send a feature set report, with the prescaler bytes as zero
 ### USBaspHIDUART utility
 
 The USBaspHIDUART is a simple console utility, used for testing the HID UART implementation. 
-
-> Note: Pre-built windows i386, x86_64 and linux x86_64 ( builded on Debian Buster. Install the hidapi with libusb backend ) shared binaries is in the bin\hiduart test\ directory.
 
 This is the help page ( USBaspHIDUART.exe -h ) :
 
