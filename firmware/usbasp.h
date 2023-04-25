@@ -58,6 +58,10 @@
 #define PROG_STATE_TPI_WRITE            6
 #define PROG_STATE_SET_REPORT           7
 
+/* uart state */
+#define UART_STATE_ENABLED              16
+#define UART_STATE_DISABLED             0
+
 /* Block mode flags */
 #define PROG_BLOCKFLAG_FIRST            1
 #define PROG_BLOCKFLAG_LAST             2

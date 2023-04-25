@@ -75,7 +75,7 @@ volatile struct
     uint8_t m_entry[tx_Q_SIZE];
 } tx_Q;
 
-void uart_config(uint16_t baud, uint8_t par, uint8_t stop, uint8_t bytes);
-void uart_disable();
+uchar uart_config(uchar *cfgData);
+uchar uart_disable();
 
 #endif // UART_H

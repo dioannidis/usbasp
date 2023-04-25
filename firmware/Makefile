@@ -17,8 +17,8 @@ CLOCK=12000000
 # ISP=ponyser  PORT=/dev/ttyS1
 # ISP=stk500   PORT=/dev/ttyS1
 # ISP=stk500v2 PORT=/dev/ttyUSB0
-ISP=usbasp
-PORT=USB
+ISP=snap_isp
+PORT=usb
 
 help:
 	@echo "Usage: make                same as make help"
@@ -39,7 +39,7 @@ help:
 
 COMPILE = avr-gcc -Wall -Wextra -fno-move-loop-invariants -fno-tree-scev-cprop -fno-inline-small-functions -Os -Iusbdrv -I. -mmcu=$(TARGET) -DF_CPU=$(CLOCK) # -DDEBUG_LEVEL=1
 
-OBJECTS = usbdrv/usbdrv.o usbdrv/usbdrvasm.o usbdrv/oddebug.o isp.o clock.o tpi.o main.o uart.o
+OBJECTS = usbdrv/usbdrv.o usbdrv/usbdrvasm.o usbdrv/oddebug.o isp.o clock.o tpi.o main.o uart.o serialnumber.o
 
 .c.o:
 	$(COMPILE) -c $< -o $@
@@ -77,7 +77,7 @@ cpp:
 	$(COMPILE) -E main.c
 
 flash:
-	avrdude -c ${ISP} -p ${TARGET} -P ${PORT} -U flash:w:main.hex:i
+	avrdude -c ${ISP} -p ${TARGET} -P ${PORT} -U flash:w:main.hex:i -U eeprom:w:main.eep.hex:i
 
 fuses:
 	avrdude -c ${ISP} -p ${TARGET} -P ${PORT} -u -U hfuse:w:$(HFUSE):m -U lfuse:w:$(LFUSE):m

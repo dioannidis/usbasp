@@ -14,6 +14,7 @@
 #include <util/atomic.h>
 
 #include "usbdrv.h"
+#include "usbasp.h"
 #include "uart.h"
 #include "cbuf.h"
 
@@ -60,7 +61,7 @@ ISR(USART_UDRE_vect, ISR_NAKED){
   ); 
 }
 
-void uart_disable(){
+uchar uart_disable(){
 
     /* Switch Rx Pullup off */
     PORTD &= ~(1 << PIND0);
@@ -71,17 +72,16 @@ void uart_disable(){
     CBUF_Init(tx_Q);
     CBUF_Init(rx_Q);
 
-
     if(usbAllRequestsAreDisabled()){
         usbEnableAllRequests();
     }
 
+    return UART_STATE_DISABLED;
+
 }
 
-void uart_config(uint16_t baud, uint8_t par, uint8_t stop, uint8_t bytes){
-
-    uart_disable();
-     
+void uart_config_int(uint16_t baud, uint8_t par, uint8_t stop, uint8_t bytes){
+    
     CBUF_Init(tx_Q);
     CBUF_Init(rx_Q);
 
@@ -119,4 +119,23 @@ void uart_config(uint16_t baud, uint8_t par, uint8_t stop, uint8_t bytes){
     /* Enable Rx Pin Pullup */
     PORTD |= (1 << PIND0);
 
+}
+
+uchar uart_config(uchar *cfgData){
+    
+    if((cfgData[1]<<8)|cfgData[0]){
+        
+        uart_config_int(
+            (cfgData[1]<<8)|cfgData[0],
+            cfgData[2] & USBASP_UART_PARITY_MASK,
+            cfgData[2] & USBASP_UART_STOP_MASK,
+            cfgData[2] & USBASP_UART_BYTES_MASK        
+        );
+        
+      return UART_STATE_ENABLED;
+      
+    }
+    
+    return uart_disable();  
+    
 }
