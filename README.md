@@ -8,7 +8,7 @@ This USBasp firmware is based on [a fork by Ralph Doncaster]. Original fork read
 - From version 1.08 the firmware is [WCID] compliant, meaning it should work on Windows without any driver or .inf install.
 - From version 1.09 a ( reliable at 9600 Baud, with 120ms - 160ms intervals for higher speeds see note at UART HID protocol ) UART HID implementation is added for debugging purposes. USBasp will appear as a composite device with a WINUSB interface and a HID interface.
 - From version 1.10 USBasp WCID switch to Microsoft OS 2.0 Descriptors. It seems that it play better with USB 3.0 ports.
-- From version 1.11 USBasp supports updating it's serial number ( see [USBaspHIDUART utility] ).
+- From version 1.11 USBasp supports updating it's serial number ( see [USBaspHIDUART utility] ) and also adds support for the AT89S51/2 ICs.
 
 ### Avrdude
 
