@@ -273,17 +273,11 @@ type
         ReceiveThread := TThreadUSBRead.Create(USBaspHIDList[USBaspIndex], ReceiveRingBuffer);
         try
           BreakLoop := false;
-          SetLength(SerialData, 1024);
+          SetLength(SerialData, 128);
           while not BreakLoop do
           begin
-            RcvBytes := ReceiveRingBuffer.Read(SerialData[0], Length(SerialData));
-            if RcvBytes > 0 then
-            begin
-              for x := 0 to RcvBytes - 1 do
-                Write(char(SerialData[x]));
-            end
-            else
-              Sleep(2);
+            SerialData[ReceiveRingBuffer.Read(SerialData[0], Length(SerialData))] := 0;
+            Write(PChar(SerialData));
             if KeyPressed then
             begin
               case ReadKey of
@@ -291,6 +285,7 @@ type
                 #13: Writeln();
               end;
             end;
+            Sleep(2);
           end;
 
           HidPacketBuffer[0] := 0;
