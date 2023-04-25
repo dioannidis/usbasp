@@ -29,6 +29,18 @@
 #include "clock.h"
 #include "tpi.h"
 #include "tpi_defs.h"
+#include "serialnumber.h"
+
+#if F_CPU == 12000000L
+    #define CAP_CLOCK USBASP_CAP_12MHZ_CLOCK
+#elif F_CPU == 16000000L
+    /* ATmega8 max speed */
+    #define CAP_CLOCK USBASP_CAP_16MHZ_CLOCK
+#elif F_CPU == 18000000L
+    #define CAP_CLOCK USBASP_CAP_18MHZ_CLOCK
+#elif F_CPU == 20000000L
+    #define CAP_CLOCK USBASP_CAP_20MHZ_CLOCK
+#endif
 
 static uchar featureReport[8] = {
     0,                                             /* Prescaler Low byte */
@@ -36,16 +48,7 @@ static uchar featureReport[8] = {
     0,                                             /* Bitmask Parity, StopBit and DataBit */
     0,                                             /* Reserved */
     USBASP_CAP_0_TPI | USBASP_CAP_HIDUART | USBASP_CAP_SNHIDUPDATE,         /* Device Capabilities */
-#if F_CPU == 12000000L
-    USBASP_CAP_12MHZ_CLOCK,                        /* Device Crystal      */
-#elif F_CPU == 16000000L                           
-    /* ATmega8 max speed */
-    USBASP_CAP_16MHZ_CLOCK,                        /* Device Crystal      */
-#elif F_CPU == 18000000L
-    USBASP_CAP_18MHZ_CLOCK,                        /* Device Crystal      */
-#elif F_CPU == 20000000L
-    USBASP_CAP_20MHZ_CLOCK,                        /* Device Crystal      */
-#endif
+    CAP_CLOCK,                                     /* Device Crystal      */
     0,                                             /* Reserved            */
     0                                              /* Reserved            */
   };
@@ -53,6 +56,8 @@ static uchar featureReport[8] = {
 static uchar replyBuffer[8];
 static uchar interruptBuffer[8];
 static uchar monitorBuffer[8];
+
+static uchar uart_state = UART_STATE_DISABLED;
 
 static uchar prog_state = PROG_STATE_IDLE;
 uchar prog_sck = USBASP_ISP_SCK_AUTO;
@@ -105,7 +110,8 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
         if((data[0] & USBRQ_RCPT_MASK) == USBRQ_RCPT_DEVICE) {
 
             if (data[1] == USBASP_FUNC_CONNECT) {
-                uart_disable(); // make it not interfere.
+
+                uart_state = uart_disable(); // make it not interfere.
 
                 /* set SCK speed */
                 ispSetSCKOption(prog_sck);
@@ -119,6 +125,12 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
             } else if (data[1] == USBASP_FUNC_DISCONNECT) {
                 ispDisconnect();
                 ledRedOff();
+  
+                /*  If the prescaler "baud" is non zero then it means that
+                UART was open and it was interrupted by an ISP connect command.
+                Re enable the UART */
+
+                uart_state = uart_config(featureReport);
 
             } else if (data[1] == USBASP_FUNC_TRANSMIT) {
                 replyBuffer[0] = ispTransmit(data[2]);
@@ -126,22 +138,9 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
                 replyBuffer[2] = ispTransmit(data[4]);
                 replyBuffer[3] = ispTransmit(data[5]);
 
-                /*  If the prescaler "baud" is non zero then it means that
-                UART was open and it was interrupted by an ISP connect command.
-                Re enable the UART */
-                if ((featureReport[1]<<8)|featureReport[0]) {
-                    uart_config(
-                        (featureReport[1]<<8)|featureReport[0],
-                        featureReport[2] & USBASP_UART_PARITY_MASK,
-                        featureReport[2] & USBASP_UART_STOP_MASK,
-                        featureReport[2] & USBASP_UART_BYTES_MASK
-                    );
-                }
-
                 len = 4;
 
             } else if (data[1] == USBASP_FUNC_READFLASH) {
-
                 if (!prog_address_newmode)
                     prog_address = (data[3] << 8) | data[2];
 
@@ -150,7 +149,6 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
                 len = USB_NO_MSG; /* multiple in */
 
             } else if (data[1] == USBASP_FUNC_READEEPROM) {
-
                 if (!prog_address_newmode)
                     prog_address = (data[3] << 8) | data[2];
 
@@ -163,7 +161,6 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
                 len = 1;
 
             } else if (data[1] == USBASP_FUNC_WRITEFLASH) {
-                
                 if (!prog_address_newmode)
                     prog_address = (data[3] << 8) | data[2];
 
@@ -178,7 +175,6 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
                 len = USB_NO_MSG; /* multiple out */
 
             } else if (data[1] == USBASP_FUNC_WRITEEEPROM) {
-
                 if (!prog_address_newmode)
                     prog_address = (data[3] << 8) | data[2];
 
@@ -189,14 +185,12 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
                 len = USB_NO_MSG; /* multiple out */
 
             } else if (data[1] == USBASP_FUNC_SETLONGADDRESS) {
-
                 /* set new mode of address delivering (ignore address delivered in commands) */
                 prog_address_newmode = 1;
                 /* set new address */
                 prog_address = *((unsigned long*) &data[2]);
 
             } else if (data[1] == USBASP_FUNC_SETISPSCK) {
-
                 /* set sck option */
                 prog_sck = data[2];
                 replyBuffer[0] = 0;
@@ -219,7 +213,6 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
                 tpi_init();
 
             } else if (data[1] == USBASP_FUNC_TPI_DISCONNECT) {
-
                 tpi_send_byte(TPI_OP_SSTCS(TPISR));
                 tpi_send_byte(0);
 
@@ -268,10 +261,12 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
                 we replied earlier in the BOS Descriptor request. See usbFunctionDescriptor. */
             } else if((data[1] == VENDOR_CODE) &&
                     (data[4] == MS_OS_2_0_DESCRIPTOR_INDEX)) {
+        
                         usbMsgFlags = USB_FLG_MSGPTR_IS_ROM;
                         usbMsgPtr = (usbMsgPtr_t)&MS_2_0_OS_DESCRIPTOR_SET;
                         len = sizeof(MS_2_0_OS_DESCRIPTOR_SET);
                         goto dontAssMsgPtr;
+
                     }
             
         }
@@ -432,8 +427,7 @@ uchar usbFunctionWrite(uchar *data, uchar len) {
     {
 
         switch (data[3]) {
-
-           case 0: {
+            case 0: {                                             
 
     /*  The first 2 bytes are the uart prescaler ( low byte first then high byte second ) 
         UART settings. The 3rd byte is a bitmask for parity, stop bit and data bit. 
@@ -441,33 +435,22 @@ uchar usbFunctionWrite(uchar *data, uchar len) {
             
         The last 4 bytes are the USBasp capabilities which are readonly. */
 
-                featureReport[0] = data[0];
-                featureReport[1] = data[1];
-                featureReport[2] = data[2];
+                    featureReport[0] = data[0];
+                    featureReport[1] = data[1];
+                    featureReport[2] = data[2];
 
-                uart_disable();
-
-    /*  To enable the UARTT the baud needs to be non zero. 
+    /*  To enable the UART the baud needs to be non zero. 
         Meaning that to disable the UART communication send a set feature report 
         with the prescaler ( first 2 bytes ) zeroed. */
         
-                if ((featureReport[1]<<8)|featureReport[0]) {
-                    uart_config(
-                        (featureReport[1]<<8)|featureReport[0], 
-                        featureReport[2] & USBASP_UART_PARITY_MASK, 
-                        featureReport[2] & USBASP_UART_STOP_MASK, 
-                        featureReport[2] & USBASP_UART_BYTES_MASK
-                    );
+                    uart_state = uart_config(featureReport);
+
                 }
-            }
                 break;
             case 1: {
-                unsigned tmp = (data[1] << 8) | data[0];
-                for (i=4; i >= 1; i--)
-                    {
-                        eeprom_update_byte(((uint8_t *)&usbDescriptorStringSerialNumber + i*2), 48 + tmp%10);
-                        tmp /= 10;
-                    }
+                
+                    serialNumberWrite(data);
+                
                 }
                 break;
             default:
@@ -562,6 +545,7 @@ void HID_EP_1_IN(){
         interruptBuffer[count++] = CBUF_Get(rx_Q, 0);
         CBUF_AdvancePopIdx(rx_Q);
     }
+    
     interruptBuffer[7] = count;
 
     /*  The 8th byte ( interruptBuffer[7] ), holds the serial bytes count or
@@ -597,14 +581,14 @@ void HID_EP_1_IN(){
 /* Device to host. Endpoint 2 Input */
 void HID_EP_3_IN(){
 
-    monitorBuffer[0] = 0;
-    monitorBuffer[1] = 0;
-    monitorBuffer[2] = 0;
-    monitorBuffer[3] = 0;
-    monitorBuffer[4] = 0;
-    monitorBuffer[5] = 0;
-    monitorBuffer[6] = 0;
-    monitorBuffer[7] = prog_state;
+    // monitorBuffer[0] = 0;
+    // monitorBuffer[1] = 0;
+    // monitorBuffer[2] = 0;
+    // monitorBuffer[3] = 0;
+    // monitorBuffer[4] = 0;
+    // monitorBuffer[5] = 0;
+    // monitorBuffer[6] = 0;
+    monitorBuffer[7] = prog_state | uart_state;
  
     usbSetInterrupt3(monitorBuffer, sizeof(monitorBuffer));
 }
@@ -631,8 +615,7 @@ int main(void) {
 
     sei();
     for (;;) {
-
-
+  
         /*  Enable transmit interrupt if tx buffer has data
             and the transmit interrupt is disabled. */
         if(!(USBASPUART_UCSRB & (1<<USBASPUART_UDRIE)) 
@@ -647,7 +630,7 @@ int main(void) {
                 usbEnableAllRequests();
             }
         }
-
+    
         usbPoll();
 
         if (usbInterruptIsReady()) {
