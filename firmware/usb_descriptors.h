@@ -151,7 +151,7 @@ PROGMEM const char usbDescriptorConfiguration[] = {
     (char)0x82,                                             /* IN endpoint number 1 */
     0x03,                                                   /* attrib: Interrupt endpoint */
     0x08, 0x00,                                             /* maximum packet size */
-    USB_CFG_INTR_POLL_INTERVAL, /* in ms */
+    USB_CFG_INTR_POLL_INTERVAL * 2, /* in ms */
 
 };
 
