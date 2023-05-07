@@ -201,11 +201,16 @@ uchar ispEnterProgrammingMode() {
             spiTx(0);
 
             if (check == 0x53) {
+                /* Don't bump up speed to 3 Mhz */
+                if(prog_sck < USBASP_ISP_SCK_1500){
+
                 /* bump up speed now that programming mode is enabled */
                 /* http://nerdralph.blogspot.com/2020/09/recording-reset-pin.html */
-                spiHWdisable();
-                ispSetSCKOption(prog_sck + 1);
-                if (ispTransmit == ispTransmit_hw) spiHWenable();
+                    spiHWdisable();
+                    ispSetSCKOption(prog_sck + 1);
+                    if (ispTransmit == ispTransmit_hw) spiHWenable();
+
+                }
                 return 0;
             }
             
