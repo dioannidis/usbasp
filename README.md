@@ -101,6 +101,20 @@ Update the USBasp's at index 3 serial number with 3456
  USBaspHIDUART -i 3 -u 3456
 ```
 
+##### _Build from source_
+
+Building USBaspHIDUART from source is very straightforward :
+
+> Note: You'll need [FreePascal[ 3.0.4 and higher installed.
+
+
+i.e. for Windows ( it's always better to build in another directory )
+
+```
+<pathtocloneddir>\utility\USBaspHIDUART>mkdir build
+<pathtocloneddir>\utility\USBaspHIDUART>cd build
+<pathtocloneddir>\utility\USBaspHIDUART\build>fpc.exe -MObjFPC -FU. -Fu..\hidapi.pas ..\USBaspHIDUART.pas -o.\USBaspHIDUART.exe
+```
 
 [a fork by Ralph Doncaster]: <https://github.com/nerdralph/usbasp>
 [with USBISP modules]: <https://www.sciencetronics.com/greenphotons/?p=938>
@@ -112,3 +126,4 @@ Update the USBasp's at index 3 serial number with 3456
 [avrdudes/avrdude]: <https://github.com/avrdudes/avrdude>
 [libUSBUARTTerminal]: <https://github.com/dioannidis/libUSBUARTTerminal>
 [USBaspHIDUART utility]: <https://github.com/dioannidis/usbasp#usbasphiduart-utility>
+[FreePascal]: <https://www.freepascal.org/>
