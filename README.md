@@ -105,7 +105,7 @@ Update the USBasp's at index 3 serial number with 3456
 
 Building USBaspHIDUART from source is very straightforward :
 
-> Note: You'll need [FreePascal[ 3.0.4 and higher installed.
+> Note: You'll need [FreePascal] 3.0.4 and higher installed.
 
 
 i.e. for Windows ( it's always better to build in another directory )
