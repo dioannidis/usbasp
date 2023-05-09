@@ -32,7 +32,7 @@ unit USBasp_HID;
 interface
 
 uses
-  Classes, SysUtils, hidapi, fgl;
+  Classes, SysUtils, hidapi;
 
 type
 
