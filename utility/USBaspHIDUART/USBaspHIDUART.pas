@@ -499,7 +499,7 @@ type
 var
   Application: TUSBaspHIDUARTTest;
 
-{$R *.res}
+//{$R *.res}
 
 begin
   Application := TUSBaspHIDUARTTest.Create(nil);
