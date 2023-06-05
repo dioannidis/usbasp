@@ -107,14 +107,24 @@ Building USBaspHIDUART from source is very straightforward :
 
 > Note: You'll need [FreePascal] 3.0.4 and higher installed.
 
+( it's always better to build in another directory )
 
-i.e. for Windows ( it's always better to build in another directory )
+Windows 
 
 ```
 <pathtocloneddir>\utility\USBaspHIDUART>mkdir build
 <pathtocloneddir>\utility\USBaspHIDUART>cd build
 <pathtocloneddir>\utility\USBaspHIDUART\build>fpc.exe -MObjFPC -FU. -Fu..\hidapi.pas ..\USBaspHIDUART.pas -o.\USBaspHIDUART.exe
 ```
+
+Linux \ FreeBSD 
+
+```
+<pathtocloneddir>\utility\USBaspHIDUART>mkdir build
+<pathtocloneddir>\utility\USBaspHIDUART>cd build
+<pathtocloneddir>\utility\USBaspHIDUART\build>fpc.exe -MObjFPC -FU. -Fu../ -Fu../hidapi.pas -dUseCThreads ../USBaspHIDUART.pas -o./USBaspHIDUART
+```
+
 
 [a fork by Ralph Doncaster]: <https://github.com/nerdralph/usbasp>
 [with USBISP modules]: <https://www.sciencetronics.com/greenphotons/?p=938>
