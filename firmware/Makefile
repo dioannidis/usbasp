@@ -13,6 +13,8 @@ TARGET ?= atmega8
 HFUSE=0xC9
 LFUSE=0xDF
 CLOCK=12000000
+TPI=
+HIDUART=
 
 # ISP=ponyser  PORT=/dev/ttyS1
 # ISP=stk500   PORT=/dev/ttyS1
@@ -34,12 +36,24 @@ help:
 	@echo "       LFUSE=${LFUSE}"
 	@echo "       HFUSE=${HFUSE}"
 	@echo "       CLOCK=${CLOCK}"
+	@echo "       TPI=$(if ifeq (${TPI},),Off,On)"
+	@echo "       HIDUART=$(if ifeq (${HIDUART},),Off,On)"
 	@echo "       ISP=${ISP}"
 	@echo "       PORT=${PORT}"
 
 COMPILE = avr-gcc -Wall -Wextra -fno-move-loop-invariants -fno-tree-scev-cprop -fno-inline-small-functions -Os -Iusbdrv -I. -mmcu=$(TARGET) -DF_CPU=$(CLOCK) # -DDEBUG_LEVEL=1
 
-OBJECTS = usbdrv/usbdrv.o usbdrv/usbdrvasm.o usbdrv/oddebug.o isp.o clock.o tpi.o main.o uart.o serialnumber.o
+OBJECTS = usbdrv/usbdrv.o usbdrv/usbdrvasm.o usbdrv/oddebug.o isp.o clock.o main.o
+
+ifneq ($(TPI),)
+COMPILE += -D__TPI__
+OBJECTS += tpi.o
+endif
+
+ifneq ($(HIDUART),)
+COMPILE += -D__HIDUART__
+OBJECTS += uart.o serialnumber.o
+endif
 
 .c.o:
 	$(COMPILE) -c $< -o $@

@@ -23,13 +23,20 @@
 #include "oddebug.h"
 #include "usbasp.h"
 #include "usbdrv.h"
-#include "uart.h"
 #include "usb_descriptors.h"
 #include "isp.h"
 #include "clock.h"
+
+#ifdef __TPI__
 #include "tpi.h"
 #include "tpi_defs.h"
+#endif
+
+#ifdef __HIDUART__
+#include "uart.h"
 #include "serialnumber.h"
+#endif
+
 
 #if F_CPU == 12000000L
     #define CAP_CLOCK USBASP_CAP_12MHZ_CLOCK
@@ -46,18 +53,26 @@ static uchar featureReport[8] = {
     0,                                             /* Prescaler Low byte */
     0,                                             /* Prescaler High byte */
     0,                                             /* Bitmask Parity, StopBit and DataBit */
-    0,                                             /* Reserved */
-    USBASP_CAP_0_TPI | USBASP_CAP_HIDUART | USBASP_CAP_SNHIDUPDATE,         /* Device Capabilities */
+    0,                                             /* Reserved */    
+    0
+#ifdef __TPI__
+    | USBASP_CAP_0_TPI  
+#endif
+#ifdef __HIDUART__
+    | USBASP_CAP_HIDUART | USBASP_CAP_SNHIDUPDATE
+#endif
+    ,         /* Device Capabilities */
     CAP_CLOCK,                                     /* Device Crystal      */
     0,                                             /* Reserved            */
     0                                              /* Reserved            */
   };
 
 static uchar replyBuffer[8];
+#ifdef __HIDUART__
 static uchar interruptBuffer[8];
-static uchar monitorBuffer[8];
-
 static uchar uart_state = UART_STATE_DISABLED;
+static uchar monitorBuffer[8];
+#endif
 
 static uchar prog_state = PROG_STATE_IDLE;
 uchar prog_sck = USBASP_ISP_SCK_AUTO;
@@ -111,8 +126,9 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
 
             if (data[1] == USBASP_FUNC_CONNECT) {
 
+#ifdef __HIDUART__
                 uart_state = uart_disable(); // make it not interfere.
-
+#endif
                 /* set SCK speed */
                 ispSetSCKOption(prog_sck);
 
@@ -130,7 +146,9 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
                 UART was open and it was interrupted by an ISP connect command.
                 Re enable the UART */
 
+#ifdef __HIDUART__
                 uart_state = uart_config(featureReport);
+#endif                
 
             } else if (data[1] == USBASP_FUNC_TRANSMIT) {
                 replyBuffer[0] = ispTransmit(data[2]);
@@ -196,6 +214,8 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
                 replyBuffer[0] = 0;
                 len = 1;
 
+#ifdef __TPI__
+
             } else if (data[1] == USBASP_FUNC_TPI_CONNECT) {
                 tpi_dly_cnt = data[2] | (data[3] << 8);
 
@@ -249,6 +269,8 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
                 prog_nbytes = (data[7] << 8) | data[6];
                 prog_state = PROG_STATE_TPI_WRITE;
                 len = USB_NO_MSG; /* multiple out */
+
+#endif
 
             } else if(data[1] == USBASP_FUNC_GETCAPABILITIES) {
                  replyBuffer[0] = featureReport[4];
@@ -320,9 +342,15 @@ uchar usbFunctionRead(uchar *data, uchar len) {
 
     /* check if programmer is in correct read state */
     if ((prog_state != PROG_STATE_READFLASH) && (prog_state
-            != PROG_STATE_READEEPROM) && (prog_state != PROG_STATE_TPI_READ)) {
+            != PROG_STATE_READEEPROM) 
+#ifdef __TPI__
+            && (prog_state != PROG_STATE_TPI_READ)
+#endif
+            ) {
         return 0xff;
     }
+
+#ifdef __TPI__
 
     /* fill packet TPI mode */
     if(prog_state == PROG_STATE_TPI_READ)
@@ -331,6 +359,8 @@ uchar usbFunctionRead(uchar *data, uchar len) {
         prog_address += len;
         return len;
     }
+
+#endif
 
     /* fill packet ISP mode */
     if((prog_state == PROG_STATE_READFLASH) || (prog_state == PROG_STATE_READEEPROM)) {
@@ -362,10 +392,15 @@ uchar usbFunctionWrite(uchar *data, uchar len) {
 
     /* check if programmer is in correct write state */
     if ((prog_state != PROG_STATE_WRITEFLASH) && (prog_state
-            != PROG_STATE_WRITEEEPROM) && (prog_state != PROG_STATE_TPI_WRITE)
+            != PROG_STATE_WRITEEEPROM) 
+#ifdef __TPI__
+            && (prog_state != PROG_STATE_TPI_WRITE)
+#endif            
             && (prog_state != PROG_STATE_SET_REPORT)) {
         return 0xff;
     }
+
+#ifdef __TPI__
 
     if (prog_state == PROG_STATE_TPI_WRITE)
     {
@@ -379,6 +414,8 @@ uchar usbFunctionWrite(uchar *data, uchar len) {
         }
         return 0;
     }
+
+#endif
 
     if((prog_state == PROG_STATE_WRITEFLASH) || (prog_state == PROG_STATE_WRITEEEPROM)) {
         for (i = 0; i < len; i++) {
@@ -442,15 +479,16 @@ uchar usbFunctionWrite(uchar *data, uchar len) {
     /*  To enable the UART the baud needs to be non zero. 
         Meaning that to disable the UART communication send a set feature report 
         with the prescaler ( first 2 bytes ) zeroed. */
-        
+#ifdef __HIDUART__        
                     uart_state = uart_config(featureReport);
-
                 }
                 break;
             case 1: {
                 
                     serialNumberWrite(data);
-                
+
+#endif
+               
                 }
                 break;
             default:
@@ -482,6 +520,8 @@ uchar usbFunctionWrite(uchar *data, uchar len) {
  *  0x00,0xC3,0x34,0x55,0x32,0xF3,0x00,0xAB -> Actual serial bytes 8 ( 8th byte > 7 ) : 0x00,0xC3,0x34,0x55,0x32,0xF3,0x00,0xAB
  *
  */
+
+#ifdef __HIDUART__        
 
 /* Host to device. Endpoint 1 Output */
 void usbFunctionWriteOut(uchar *data, uchar len){
@@ -593,6 +633,8 @@ void HID_EP_3_IN(){
     usbSetInterrupt3(monitorBuffer, sizeof(monitorBuffer));
 }
 
+#endif
+
 int main(void) {
 
     /* enable debug if DEBUG_LEVEL > 0 */
@@ -616,6 +658,7 @@ int main(void) {
     sei();
     for (;;) {
   
+#ifdef __HIDUART__        
         /*  Enable transmit interrupt if tx buffer has data
             and the transmit interrupt is disabled. */
         if(!(USBASPUART_UCSRB & (1<<USBASPUART_UDRIE)) 
@@ -630,9 +673,10 @@ int main(void) {
                 usbEnableAllRequests();
             }
         }
-    
+#endif    
         usbPoll();
 
+#ifdef __HIDUART__        
         if (usbInterruptIsReady()) {
             HID_EP_1_IN();
         }
@@ -640,6 +684,7 @@ int main(void) {
         if (usbInterruptIsReady3()) {
             HID_EP_3_IN();
         }
+#endif
 
     }
 

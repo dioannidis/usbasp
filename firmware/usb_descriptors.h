@@ -67,6 +67,8 @@ PROGMEM const char usbDescriptorDevice[] = {
     1,                                                      /* number of configurations */
 };
 
+#ifdef __HIDUART__
+
 PROGMEM const char usbDescriptorConfiguration[] = {
     9,                                                      /* sizeof(usbDescrConfig): length of descriptor in bytes */
     USBDESCR_CONFIG,                                        /* descriptor type */
@@ -299,5 +301,97 @@ PROGMEM const char usbDescriptorHidReport[] = {
     0xB2, 0x02, 0x01,               //   FEATURE (Data,Var,Abs,Buf)
     0xC0                            // END_COLLECTION
 };
+
+#else
+    
+PROGMEM const char usbDescriptorConfiguration[] = {
+    9,                                                      /* sizeof(usbDescrConfig): length of descriptor in bytes */
+    USBDESCR_CONFIG,                                        /* descriptor type */
+    0x12,
+    0,                                                      /* total length of data returned (including inlined descriptors) */
+    1,                                                      /* number of interfaces in this configuration */
+    1,                                                      /* index of this configuration */
+    0,                                                      /* configuration name string index */
+    #if USB_CFG_IS_SELF_POWERED
+    (1 << 7) | USBATTR_SELFPOWER,                           /* attributes */
+    #else
+    (1 << 7),                                               /* attributes */
+    #endif
+    USB_CFG_MAX_BUS_POWER/2,                                /* max USB current in 2mA units */
+
+    /* interface descriptor follows inline: */
+
+    9,                                                      /* sizeof(usbDescrInterface): length of descriptor in bytes */
+    USBDESCR_INTERFACE,                                     /* descriptor type */
+    0,                                                      /* index of this interface */
+    0,                                                      /* alternate setting for this interface */
+    0,                                                      /* endpoints excl 0: number of endpoint descriptors to follow */
+    0xFF,                                                   /* USB_CFG_INTERFACE_CLASS */
+    0,                                                      /* USB_CFG_INTERFACE_SUBCLASS */
+    0,                                                      /* USB_CFG_INTERFACE_PROTOCOL */
+    2                                                       /* string index for interface */
+
+};
+
+/* BOS Descriptor */
+PROGMEM const char BOS_DESCRIPTOR[] = {
+    
+    /* BOS Descriptor Header */
+    0x05,                                                  /* Size of descriptor */
+    USBDESCR_BOS,                                          /* Descriptor type */
+    0x21, 0x00,                                            /* Length of this descriptor and all of its sub descriptors */
+    0x01,                                                  /* The number of separate device capability descriptors in the BOS */
+
+    /* Device Capability Descriptor - Platform */
+    0x1C,                                                  /* Length */
+    USBDESCR_DEVICE_CAPABILITY_TYPE,                       /* Descriptor Type */
+    USBDESCR_DEVICE_CAPABILITY_PLATFORM,                   /* Device Capability Type */
+    0x00,                                                  /* Reserved */
+    0xDF, 0x60, 0xDD, 0xD8, 0x89, 0x45, 0xC7, 0x4C,        /* MS OS 2.0 Platform Capability */
+    0x9C, 0xD2, 0x65, 0x9D, 0x9E, 0x64, 0x8A, 0x9F,        /* {D8DD60DF-4589-4CC7-9CD2-659D9E648A9F} */
+    0x00, 0x00, 0x03, 0x06,                                /* Windows Version - Windows 8.1 or later */
+    0x9E, 0x00,                                            /* Size of MS OS 2.0 Descriptor set */
+    VENDOR_CODE,                                           /* Vendor Request Code */
+    0x00                                                   /* Alternate Enumeration support - 0 No support */
+
+};
+
+/* Microsft OS 2.0 Descriptor Set */
+PROGMEM const char MS_2_0_OS_DESCRIPTOR_SET[] = {
+
+    /* MS OS 2.0 Descriptor Set Header */
+    0x0A, 0x00,                                            /* Size of descriptor */
+    MS_OS_20_SET_HEADER_DESCRIPTOR,                        /* Descriptor Type */
+    0x00, 0x00, 0x03, 0x06,                                /* Windows Version - Windows 8.1 or later */
+    0x9E, 0x00,                                            /* Size of MS OS 2.0 Descriptor set */
+
+    /* MS OS 2.0 Compatible ID Descriptor */
+    0x14, 0x00,                                            /* Size of descriptor */
+    MS_OS_20_FEATURE_COMPATIBLE_ID,                        /* Descriptor Type */
+    'W','I','N','U','S','B', 0x00, 0x00,                   /* Windows string Compatible ID */
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,        /* Windows string SubCompatible ID */
+
+    /* MS OS 2.0 Registry Property Descriptor */
+    0x80, 0x00,                                            /* Size of descriptor */
+    MS_OS_20_FEATURE_REG_PROPERTY,                         /* Descriptor Type */
+    MS_OS_20_REG_PROPERTY_REG_SZ,                          /* The type of registry property */
+    0x28, 0x00,                                            /* The length of the property name */
+    'D',0x00,'e',0x00,'v',0x00,'i',0x00,'c',0x00,          /* The name of the property name */
+    'e',0x00,'I',0x00,'n',0x00,'t',0x00,'e',0x00,          /*    -//-    */
+    'r',0x00,'f',0x00,'a',0x00,'c',0x00,'e',0x00,          /*    -//-    */
+    'G',0x00,'U',0x00,'I',0x00,'D',0x00,0x00,0x00,         /*    -//-    */
+    0x4e, 0x00,                                            /* The length of property data */
+    '{',0x00,'A',0x00,'D',0x00,'5',0x00,'7',0x00,          /* Property data */
+    'D',0x00,'3',0x00,'B',0x00,'9',0x00,'-',0x00,          /*    -//-    */
+    '1',0x00,'1',0x00,'6',0x00,'6',0x00,'-',0x00,          /*    -//-    */
+    '4',0x00,'3',0x00,'F',0x00,'8',0x00,'-',0x00,          /*    -//-    */
+    '8',0x00,'7',0x00,'9',0x00,'0',0x00,'-',0x00,          /*    -//-    */
+    '0',0x00,'B',0x00,'E',0x00,'1',0x00,'4',0x00,          /*    -//-    */
+    'D',0x00,'D',0x00,'C',0x00,'7',0x00,'5',0x00,          /*    -//-    */
+    '0',0x00,'4',0x00,'}',0x00,0x00,0x00                   /*    -//-    */
+
+};
+
+#endif
 
 #endif

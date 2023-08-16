@@ -73,19 +73,30 @@ section at the end of this file).
  */
 
 /* --------------------------- Functional Range ---------------------------- */
-
+#ifdef __HIDUART__
 #define USB_CFG_HAVE_INTRIN_ENDPOINT    1
+#else
+#define USB_CFG_HAVE_INTRIN_ENDPOINT    0
+#endif    
 /* Define this to 1 if you want to compile a version with two endpoints: The
  * default control endpoint 0 and an interrupt-in endpoint (any other endpoint
  * number).
  */
+#ifdef __HIDUART__
 #define USB_CFG_HAVE_INTRIN_ENDPOINT3   1
+#else
+#define USB_CFG_HAVE_INTRIN_ENDPOINT3   0
+#endif    
 /* Define this to 1 if you want to compile a version with three endpoints: The
  * default control endpoint 0, an interrupt-in endpoint 3 (or the number
  * configured below) and a catch-all default interrupt-in endpoint as above.
  * You must also define USB_CFG_HAVE_INTRIN_ENDPOINT to 1 for this feature.
  */
+#ifdef __HIDUART__
 #define USB_CFG_EP3_NUMBER              2
+#else
+#define USB_CFG_EP3_NUMBER              3
+#endif    
 /* If the so-called endpoint 3 is used, it can now be configured to any other
  * endpoint number (except 0) with this macro. Default if undefined is 3.
  */
@@ -95,7 +106,11 @@ section at the end of this file).
  * Since the token is toggled BEFORE sending any data, the first packet is
  * sent with the oposite value of this configuration!
  */
+#ifdef __HIDUART__
 #define USB_CFG_IMPLEMENT_HALT          1
+#else
+#define USB_CFG_IMPLEMENT_HALT          0
+#endif    
 /* Define this to 1 if you also want to implement the ENDPOINT_HALT feature
  * for endpoint 1 (interrupt endpoint). Although you may not need this feature,
  * it is required by the standard. We have made it a config option because it
@@ -123,24 +138,40 @@ section at the end of this file).
  * The value is in milliamperes. [It will be divided by two since USB
  * communicates power requirements in units of 2 mA.]
  */
+#ifdef __HIDUART__
 #define USB_CFG_IMPLEMENT_FN_WRITE      1
+#else
+#define USB_CFG_IMPLEMENT_FN_WRITE      0
+#endif    
 /* Set this to 1 if you want usbFunctionWrite() to be called for control-out
  * transfers. Set it to 0 if you don't need it and want to save a couple of
  * bytes.
  */
+#ifdef __HIDUART__
 #define USB_CFG_IMPLEMENT_FN_READ       1
+#else
+#define USB_CFG_IMPLEMENT_FN_READ       0
+#endif    
 /* Set this to 1 if you need to send control replies which are generated
  * "on the fly" when usbFunctionRead() is called. If you only want to send
  * data from a static buffer, set it to 0 and return the data from
  * usbFunctionSetup(). This saves a couple of bytes.
  */
+#ifdef __HIDUART__
 #define USB_CFG_IMPLEMENT_FN_WRITEOUT   1
+#else
+#define USB_CFG_IMPLEMENT_FN_WRITEOUT   0
+#endif    
 /* Define this to 1 if you want to use interrupt-out (or bulk out) endpoints.
  * You must implement the function usbFunctionWriteOut() which receives all
  * interrupt/bulk data sent to any endpoint other than 0. The endpoint number
  * can be found in 'usbRxToken'.
  */
+#ifdef __HIDUART__
 #define USB_CFG_HAVE_FLOWCONTROL        1
+#else
+#define USB_CFG_HAVE_FLOWCONTROL        0
+#endif    
 /* Define this to 1 if you want flowcontrol over USB data. See the definition
  * of the macros usbDisableAllRequests() and usbEnableAllRequests() in
  * usbdrv.h.
@@ -279,7 +310,11 @@ section at the end of this file).
  * HID class is 3, no subclass and protocol required (but may be useful!)
  * CDC class is 2, use subclass 2 and protocol 1 for ACM
  */
+#ifdef __HIDUART__
 #define USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH    0x22 
+#else
+#define USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH    0
+#endif    
 /* Define this to the length of the HID report descriptor, if you implement
  * an HID device. Otherwise don't define it or define it to 0.
  * If you use this define, you must add a PROGMEM character array named
@@ -352,7 +387,13 @@ section at the end of this file).
  */
 
 #define USB_CFG_DESCR_PROPS_DEVICE                  USB_PROP_LENGTH(18) 
+
+#ifdef __HIDUART__
 #define USB_CFG_DESCR_PROPS_CONFIGURATION           USB_PROP_LENGTH(75)
+#else
+#define USB_CFG_DESCR_PROPS_CONFIGURATION           USB_PROP_LENGTH(18)
+#endif
+
 #define USB_CFG_DESCR_PROPS_STRINGS                 0
 #define USB_CFG_DESCR_PROPS_STRING_0                0
 #define USB_CFG_DESCR_PROPS_STRING_VENDOR           0 
