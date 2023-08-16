@@ -15,6 +15,7 @@ LFUSE=0xDF
 CLOCK=12000000
 TPI=
 HIDUART=
+PDI=
 
 # ISP=ponyser  PORT=/dev/ttyS1
 # ISP=stk500   PORT=/dev/ttyS1
@@ -38,6 +39,7 @@ help:
 	@echo "       CLOCK=${CLOCK}"
 	@echo "       TPI=$(if ifeq (${TPI},),Off,On)"
 	@echo "       HIDUART=$(if ifeq (${HIDUART},),Off,On)"
+	@echo "       PDI=$(if ifeq (${PDI},),Off,On)"
 	@echo "       ISP=${ISP}"
 	@echo "       PORT=${PORT}"
 
@@ -48,6 +50,11 @@ OBJECTS = usbdrv/usbdrv.o usbdrv/usbdrvasm.o usbdrv/oddebug.o isp.o clock.o main
 ifneq ($(TPI),)
 COMPILE += -D__TPI__
 OBJECTS += tpi.o
+endif
+
+ifneq ($(PDI),)
+COMPILE += -D__PDI__
+OBJECTS += pdi.o
 endif
 
 ifneq ($(HIDUART),)

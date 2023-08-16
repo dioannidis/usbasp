@@ -2,12 +2,13 @@
  * usbasp.c - part of USBasp
  *
  * 2023 Add USBASP_CAP_SNHIDUPDATE by Dimitrios Chr. Ioannidis ( d.ioannidis@nephelae.eu )
+ * 2023 Add PDI definitions by Dimitrios Chr. Ioannidis ( d.ioannidis@nephelae.eu )
  *
  * Autor..........: Thomas Fischl <tfischl@gmx.de>
  * Description....: Definitions and macros for usbasp
  * Licence........: GNU GPL v2 (see Readme.txt)
  * Creation Date..: 2009-02-28
- * Last change....: 2023-03-22
+ * Last change....: 2023-08-16
  */
 
 #ifndef USBASP_H_
@@ -32,13 +33,20 @@
 #define USBASP_FUNC_TPI_RAWWRITE        14
 #define USBASP_FUNC_TPI_READBLOCK       15
 #define USBASP_FUNC_TPI_WRITEBLOCK      16
-#define USBASP_FUNC_GETCAPABILITIES     127
+// PDI:
+#define USBASP_FUNC_PDI_CONNECT         17
+#define USBASP_FUNC_PDI_DISCONNECT      18
+#define USBASP_FUNC_PDI_READ            19
+#define USBASP_FUNC_PDI_SEND            20
 // UART:
 #define USBASP_FUNC_UART_CONFIG         60
 #define USBASP_FUNC_UART_DISABLE        63
 
+#define USBASP_FUNC_GETCAPABILITIES     127
+
 /* USBASP capabilities */
 #define USBASP_CAP_0_TPI                0x01
+#define USBASP_CAP_0_PDI                0x02
 #define USBASP_CAP_6_UART               0x40
 #define USBASP_CAP_HIDUART              0x80
 #define USBASP_CAP_SNHIDUPDATE          0x20
@@ -56,7 +64,13 @@
 #define PROG_STATE_WRITEEEPROM          4
 #define PROG_STATE_TPI_READ             5
 #define PROG_STATE_TPI_WRITE            6
-#define PROG_STATE_SET_REPORT           7
+#define PROG_STATE_PDI_READ             7
+#define PROG_STATE_PDI_SEND             8
+#define PROG_STATE_SET_REPORT           9
+
+/* pdi state */
+#define USBASP_PDI_WAIT_BUSY            1
+#define USBASP_PDI_MARK_BUSY            2
 
 /* uart state */
 #define UART_STATE_ENABLED              16
@@ -65,6 +79,11 @@
 /* Block mode flags */
 #define PROG_BLOCKFLAG_FIRST            1
 #define PROG_BLOCKFLAG_LAST             2
+
+/* PDI RESET */
+#define EXIT_RESET_UNSPEC               0
+#define EXIT_RESET_ENABLED              1
+#define EXIT_RESET_DISABLED             2
 
 /* ISP SCK speed identifiers */
 #define USBASP_ISP_SCK_AUTO             0
