@@ -368,7 +368,7 @@ PROGMEM const char MS_2_0_OS_DESCRIPTOR_SET[] = {
     /* MS OS 2.0 Compatible ID Descriptor */
     0x14, 0x00,                                            /* Size of descriptor */
     MS_OS_20_FEATURE_COMPATIBLE_ID,                        /* Descriptor Type */
-    'L','I','B','U','S','B', 0x00, 0x00,                   /* Windows string Compatible ID */
+    'W','I','N','U','S','B', 0x00, 0x00,                   /* Windows string Compatible ID */
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,        /* Windows string SubCompatible ID */
 
     /* MS OS 2.0 Registry Property Descriptor */
