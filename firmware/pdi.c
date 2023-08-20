@@ -11,7 +11,9 @@
  
 #include "pdi.h"
 #include "usbasp.h"
+#include "usbdrv.h"
 #include <avr/io.h>
+#include <avr/interrupt.h>
 #include <avr/pgmspace.h>
 #include <util/parity.h>
 #include "usbconfig.h"
@@ -19,14 +21,60 @@
 #include "xmega_pdi.h"
 
 #ifndef F_CPU
-//#define F_CPU (USB_CFG_CLOCK_KHZ*1000)
+#define F_CPU (USB_CFG_CLOCK_KHZ*1000)
 #define F_CPU 12000000
 #endif
 #include <util/delay.h>
 
 uchar pdi_nvmbusy=0;
 
-PROGMEM static const uchar pdi_key[8]={0xFF,0x88,0xD8,0xCD,0x45,0xAB,0x89,0x12};
+PROGMEM const uchar pdi_key[8]={0xFF,0x88,0xD8,0xCD,0x45,0xAB,0x89,0x12};
+
+static uchar pdiFrame[12]  = {0,0,0,0,0,0,0,0,0,0,0,0};
+volatile uchar pdiSendFrameBit = 0;
+volatile uchar pdiFrameBitState = 0;
+
+ISR(TIMER2_COMP_vect)
+{   
+
+/* From V-USB usbdrv.h
+
+Interrupt latency:
+The application must ensure that the USB interrupt is not disabled for more
+than 25 cycles (this is for 12 MHz, faster clocks allow longer latency).
+This implies that all interrupt routines must either have the "ISR_NOBLOCK"
+attribute set (see "avr/interrupt.h") or be written in assembler with "sei"
+as the first instruction.
+
+Maximum interrupt duration / CPU cycle consumption:
+The driver handles all USB communication during the interrupt service
+routine. The routine will not return before an entire USB message is received
+and the reply is sent. This may be up to ca. 1200 cycles @ 12 MHz (= 100us) if
+the host conforms to the standard. The driver will consume CPU cycles for all
+USB messages, even if they address another (low-speed) device on the same bus.
+
+*/
+
+/* From Atmel-8331-8-and-16-bit-AVR-Microcontroller-XMEGA-AU_Manual.pdf
+
+32.3.2 Disabling
+If the clock frequency on PDI_CLK is lower than approximately 10kHz, this is regarded as inactivity on the clock line. This will automatically disable the PDI. If not disabled by a fuse, the reset function of the Reset (PDI_CLK) pin is enabled again. This also means that the minimum programming frequency is approximately 10kHz
+
+*/
+    
+    uint8_t frameBit = pdiSendFrameBit;
+    uint8_t frameBitState = pdiFrame[frameBit];
+    sei();
+    if ((!(PINB&(1<<3))) && (frameBit)) {
+            if (!frameBitState){
+                    PORTB &= ~(1<<5);
+            } else {
+                    PORTB |= (1<<5);
+            }
+            --pdiSendFrameBit;
+     }       
+
+}
 
 static void pdiWaitBit()
 {
@@ -35,29 +83,36 @@ static void pdiWaitBit()
 
 uchar pdiInit()
 {
-    //12MHz/256 -> 46k
-    TCCR2=(0<<CS22)|(0<CS21)|(1<<CS20)|(0<<COM21)|(0<<COM20)|(1<<WGM21)|(0<<WGM20);
-    OCR2=32;
-    PORTB |= (1<<3); PORTB &= ~((1<<4)|(1<<5)|(1<<2));
-    DDRB |= (1<<3)|(1<<2); DDRB &= ~((1<<4)|(1<<5));
+    TCCR2=(1<<CS22)|(1<CS21)|(0<<CS20)|(0<<COM21)|(0<<COM20)|(1<<WGM21)|(0<<WGM20);
+    OCR2=9;
+    PORTB |= (1<<3); 
+    PORTB &= ~((1<<4)|(1<<5)|(1<<2));
+    DDRB |= (1<<3); 
+    DDRB |= (1<<2); 
+    DDRB &= ~(1<<4);        
+    DDRB &= ~(1<<5);        
+
+    pdiSendFrameBit = 0;
 
     pdiSetClk0();
     pdiSetData0();
-    _delay_us(110);
+    _delay_ms(10);
 
     pdiSetData1();
-    pdiSetClk1();
-    _delay_us(1);
+    _delay_us(5);    
+        
+    pdiEnableTimerClock();
+    
     pdiSendIdle();
     pdiSendIdle();
-
+    
     pdiResetDev(1);
 
     uchar buf[9];
     buf[0]=XNVM_PDI_KEY_INSTR;
     memcpy_P(&buf[1],pdi_key,8);
     pdiSendBytes(buf,9);
-
+    
     pdiSendIdle();
 
     pdiSendByte(XNVM_PDI_STCS_INSTR | XOCD_CTRL_REGISTER_ADDRESS);
@@ -65,25 +120,25 @@ uchar pdiInit()
 
     pdiSendIdle();
 
-    uchar status=pdiWaitNVM();
-    if (status==PDI_STATUS_OK)
-    {
-        pdiEnableTimerClock();
-        return PDI_STATUS_OK;
-    }
-
-    return status;
+    return pdiWaitNVM();
 }
 
 void pdiCleanup(uchar keep_reset)
 {
-    pdiDisableTimerClock();
     pdiSendIdle();
+    
     pdiResetDev(0);
+    
+    pdiSendFrameBit = 0;   
+    pdiDisableTimerClock();
 
-    DDRB &= ~((1<<3)|(1<<5)|(1<<2)|(1<<4));
+    DDRB &= ~(1<<3);
+    DDRB &= ~(1<<5);
+    DDRB &= ~(1<<2);
+    DDRB &= ~(1<<4);
     PORTB &= ~((1<<3)|(1<<5)|(1<<2)|(1<<4));
 
+    
     switch(keep_reset)
     {
     case EXIT_RESET_DISABLED:
@@ -102,14 +157,15 @@ void pdiCleanup(uchar keep_reset)
 
 void pdiEnableTimerClock()
 {
-    pdiSetData1();
-    TCCR2=(0<<CS22)|(0<CS21)|(1<<CS20)|(0<<COM21)|(1<<COM20)|(1<<WGM21)|(0<<WGM20);
+    TCCR2=(1<<CS22)|(1<CS21)|(0<<CS20)|(0<<COM21)|(1<<COM20)|(1<<WGM21)|(0<<WGM20);
+    TIFR |= (1<<OCF2);
+    TIMSK |= (1<<OCIE2);
 }
 
 void pdiDisableTimerClock()
 {
-    pdiSetData1();
-    TCCR2=(0<<CS22)|(0<CS21)|(1<<CS20)|(0<<COM21)|(0<<COM20)|(1<<WGM21)|(0<<WGM20);
+    TIMSK &= ~(1<<OCIE2);
+    TCCR2=(1<<CS22)|(1<CS21)|(0<<CS20)|(0<<COM21)|(0<<COM20)|(1<<WGM21)|(0<<WGM20);
 }
 
 uchar pdiTimerClockEnabled()
@@ -181,44 +237,51 @@ void pdiSendByte(uchar b)
 void pdiSendBytes(uchar* ptr,uchar count)
 {
     for(;count>0;count--,ptr++)
-    pdiSendByte(*ptr);
+      pdiSendByte(*ptr);
 }
 
+// uchar reverseByte(uchar byte)
+// {
+	// uchar rvrsByte = 0;
+	// if (byte & 0x01) rvrsByte |= 0x80;
+	// if (byte & 0x02) rvrsByte |= 0x40;
+	// if (byte & 0x04) rvrsByte |= 0x20;
+	// if (byte & 0x08) rvrsByte |= 0x10;
+	// if (byte & 0x10) rvrsByte |= 0x08;
+	// if (byte & 0x20) rvrsByte |= 0x04;
+	// if (byte & 0x40) rvrsByte |= 0x02;
+	// if (byte & 0x80) rvrsByte |= 0x01;
+	// return(rvrsByte);
+// }
+
 void pdiSendByteX(uchar byte,uchar extra)
-{
-    pdiSetClk0();
-    if (extra&PDI_BIT_START) pdiSetData1(); else pdiSetData0();
-    pdiWaitBit();
-    pdiSetClk1();
-    pdiWaitBit();
-
-    uchar bit;
-    for(bit=1;bit;bit<<=1)
+{ 
+    uchar pdiFrameTmp[12]  = {0,0,0,0,0,0,0,0,0,0,0,0};
+    
+    if (extra&PDI_BIT_START) pdiFrameTmp[11] = 1; else pdiFrameTmp[11] = 0;
+    pdiFrameTmp[10] = (byte & 0x01);
+    pdiFrameTmp[9] = (byte & 0x02);
+    pdiFrameTmp[8] = (byte & 0x04);
+    pdiFrameTmp[7] = (byte & 0x08);
+    pdiFrameTmp[6] = (byte & 0x10);
+    pdiFrameTmp[5] = (byte & 0x20);
+    pdiFrameTmp[4] = (byte & 0x40);
+    pdiFrameTmp[3] = (byte & 0x80);
+    if (extra&PDI_BIT_PARITY) pdiFrameTmp[2] = 1; else pdiFrameTmp[2] = 0;
+    if (extra&PDI_BIT_STOP) 
     {
-        pdiSetClk0();
-        if (byte & bit) pdiSetData1(); else pdiSetData0();
-        pdiWaitBit();
-        pdiSetClk1();
-        pdiWaitBit();
+        pdiFrameTmp[1] = 1;
+        pdiFrameTmp[0] = 1;
+    } else {
+        pdiFrameTmp[1] = 0;
+        pdiFrameTmp[0] = 0;
     }
-
-    pdiSetClk0();
-    if (extra&PDI_BIT_PARITY) pdiSetData1(); else pdiSetData0();
-    pdiWaitBit();
-    pdiSetClk1();
-    pdiWaitBit();
-
-    pdiSetClk0();
-    if (extra&PDI_BIT_STOP) pdiSetData1(); else pdiSetData0();
-    pdiWaitBit();
-    pdiSetClk1();
-    pdiWaitBit();
-
-    pdiSetClk0();
-    if (extra&PDI_BIT_STOP) pdiSetData1(); else pdiSetData0();
-    pdiWaitBit();
-    pdiSetClk1();
-    pdiWaitBit();
+    
+    memcpy(pdiFrame, pdiFrameTmp, 12);
+    usbDisableAllRequests();
+    pdiSendFrameBit = 12;
+    while(pdiSendFrameBit != 0);
+    
 }
 
 uchar pdiReadByte(uchar timeout,uchar *result)
@@ -226,46 +289,46 @@ uchar pdiReadByte(uchar timeout,uchar *result)
     uchar in=PDI_STATUS_TIMEOUT,ret=PDI_STATUS_OK;
     for(;timeout>0;timeout--)
     {
-        pdiSetClk0();
-        pdiSetDataIn();
+        // pdiSetClk0();
+        // pdiSetDataIn();
         pdiWaitBit();
-        pdiSetClk1();
+        // pdiSetClk1();
         in=pdiGetData();
         pdiWaitBit();
-        if (in==0) break;
+        // if (in==0) break;
     }
     if (in) return PDI_STATUS_TIMEOUT;
 
-    uchar bit,byte=0,parity;
-    for(bit=1;bit;bit<<=1)
-    {
-        pdiSetClk0();
-        pdiWaitBit();
-        pdiSetClk1();
-        if (pdiGetData()) byte|=bit;
-        pdiWaitBit();
-    }
-    *result=byte;
+    // uchar bit,byte=0,parity;
+    // for(bit=1;bit;bit<<=1)
+    // {
+        // pdiSetClk0();
+        // pdiWaitBit();
+        // pdiSetClk1();
+        // if (pdiGetData()) byte|=bit;
+        // pdiWaitBit();
+    // }
+    // *result=byte;
 
-    pdiSetClk0();
-    pdiWaitBit();
-    pdiSetClk1();
-    parity=pdiGetData();
-    pdiWaitBit();
+    // pdiSetClk0();
+    // pdiWaitBit();
+    // pdiSetClk1();
+    // parity=pdiGetData();
+    // pdiWaitBit();
 
-    if (parity!=byteParity(byte)) ret=PDI_STATUS_PARITY;
+    // if (parity!=byteParity(byte)) ret=PDI_STATUS_PARITY;
 
-    pdiSetClk0();
-    pdiWaitBit();
-    pdiSetClk1();
-    if ((ret==PDI_STATUS_OK)&&(!pdiGetData())) ret=PDI_STATUS_BADSTOP;
-    pdiWaitBit();
+    // pdiSetClk0();
+    // pdiWaitBit();
+    // pdiSetClk1();
+    // if ((ret==PDI_STATUS_OK)&&(!pdiGetData())) ret=PDI_STATUS_BADSTOP;
+    // pdiWaitBit();
 
-    pdiSetClk0();
-    pdiWaitBit();
-    pdiSetClk1();
-    if ((ret==PDI_STATUS_OK)&&(!pdiGetData())) ret=PDI_STATUS_BADSTOP;
-    pdiWaitBit();
+    // pdiSetClk0();
+    // pdiWaitBit();
+    // pdiSetClk1();
+    // if ((ret==PDI_STATUS_OK)&&(!pdiGetData())) ret=PDI_STATUS_BADSTOP;
+    // pdiWaitBit();
 
     return ret;
 }

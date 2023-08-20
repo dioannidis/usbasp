@@ -766,6 +766,11 @@ int main(void) {
         }
         
 #endif 
+
+        if(pdiSendFrameBit == 0){
+        if(usbAllRequestsAreDisabled()){
+                usbEnableAllRequests();
+        }}
    
         usbPoll();
 

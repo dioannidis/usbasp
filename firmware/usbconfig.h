@@ -167,11 +167,11 @@ section at the end of this file).
  * interrupt/bulk data sent to any endpoint other than 0. The endpoint number
  * can be found in 'usbRxToken'.
  */
-#ifdef __HIDUART__
+// #ifdef __HIDUART__
 #define USB_CFG_HAVE_FLOWCONTROL        1
-#else
-#define USB_CFG_HAVE_FLOWCONTROL        0
-#endif    
+// #else
+// #define USB_CFG_HAVE_FLOWCONTROL        0
+// #endif    
 /* Define this to 1 if you want flowcontrol over USB data. See the definition
  * of the macros usbDisableAllRequests() and usbEnableAllRequests() in
  * usbdrv.h.
