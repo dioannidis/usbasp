@@ -410,13 +410,13 @@ uchar usbFunctionRead(uchar *data, uchar len) {
     /* fill packet PDI mode */
     if(prog_state == PROG_STATE_PDI_READ)
     {
-        pdiDisableTimerClock();
-        pdiSendIdle();
-        if (pdi_nvmbusy)
-        pdiWaitNVM();
-        uchar ret=pdiReadBlock(prog_address, data, len);
-        pdiEnableTimerClock();
-        if (ret!=PDI_STATUS_OK)
+        // pdiDisableTimerClock();
+        // pdiSendIdle();
+        // if (pdi_nvmbusy)
+        // pdiWaitNVM();
+        // uchar ret=pdiReadBlock(prog_address, data, len);
+        // pdiEnableTimerClock();
+        // if (ret!=PDI_STATUS_OK)
         return 0;
         prog_address += len;
         return len;
@@ -489,19 +489,19 @@ uchar usbFunctionWrite(uchar *data, uchar len) {
         memmove(&prog_buf[prog_buf_pos],data,len);
         prog_buf_pos += len;
         prog_nbytes -= len;
-        if (prog_nbytes==0)
-        {
-            pdiDisableTimerClock();
-            pdiSendIdle();
-            if ((prog_blockflags & USBASP_PDI_WAIT_BUSY) && pdi_nvmbusy)
-            pdiWaitNVM();
-            pdiSendBytes(prog_buf,prog_buf_pos);
-            if (prog_blockflags & USBASP_PDI_MARK_BUSY)
-            pdi_nvmbusy=1;
-            pdiEnableTimerClock();
-            prog_state = PROG_STATE_IDLE;
-            return 1;
-        }
+        // if (prog_nbytes==0)
+        // {
+            // pdiDisableTimerClock();
+            // pdiSendIdle();
+            // if ((prog_blockflags & USBASP_PDI_WAIT_BUSY) && pdi_nvmbusy)
+            // pdiWaitNVM();
+            // pdiSendBytes(prog_buf,prog_buf_pos);
+            // if (prog_blockflags & USBASP_PDI_MARK_BUSY)
+            // pdi_nvmbusy=1;
+            // pdiEnableTimerClock();
+            // prog_state = PROG_STATE_IDLE;
+            // return 1;
+        // }
         return 0;
     }
 
@@ -766,13 +766,18 @@ int main(void) {
         }
         
 #endif 
-
-        if(pdiSendFrameBit == 0){
-        if(usbAllRequestsAreDisabled()){
-                usbEnableAllRequests();
-        }}
    
-        usbPoll();
+#ifdef __PDI__        
+
+        if(pdiBusy == 0){
+            if(usbAllRequestsAreDisabled()){
+                usbEnableAllRequests();
+            }
+        }
+
+#endif 
+
+        usbPoll();                
 
 #ifdef __HIDUART__        
 

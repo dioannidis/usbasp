@@ -32,7 +32,7 @@ extern uchar pdi_nvmbusy;
 #define PDI_STATUS_NVM_TIMEOUT 4
 #define PDI_STATUS_COLLISION 5
 
-extern volatile uchar pdiSendFrameBit;
+extern volatile uchar pdiBusy;
 
 uchar pdiInit();
 void pdiCleanup(uchar keep_reset);
