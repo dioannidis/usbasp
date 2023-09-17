@@ -18,6 +18,15 @@
 #define	uchar	unsigned char
 #endif
 
+#define PDI_OUT   PORTB
+#define PDI_IN    PINB
+#define PDI_DDR   DDRB
+#define PDI_RST   PB2
+#define PDI_MOSI  PB3
+#define PDI_MISO  PB4
+#define PDI_SCK   PB5
+
+
 extern uchar pdi_active;
 extern uchar pdi_interrupted;
 extern uchar pdi_interrupt_count;
@@ -32,7 +41,7 @@ extern uchar pdi_nvmbusy;
 #define PDI_STATUS_NVM_TIMEOUT 4
 #define PDI_STATUS_COLLISION 5
 
-extern volatile uchar pdiBusy;
+extern volatile uchar pdiState;
 
 uchar pdiInit();
 void pdiCleanup(uchar keep_reset);
