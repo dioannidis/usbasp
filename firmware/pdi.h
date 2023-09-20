@@ -43,6 +43,7 @@ uchar pdiConnect();
 void pdiDisconnect(uchar keep_reset);
 uchar pdiEnterProgrammingMode();
 uchar pdiWaitNVM();
+void pdiSendBytes(uchar* ptr, uchar count);
 uchar pdiReadBlock(uint32_t address, uchar* dataBuf, uchar lenAsked);
 
 #endif
