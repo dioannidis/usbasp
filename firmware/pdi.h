@@ -41,23 +41,15 @@ extern uchar pdi_nvmbusy;
 #define PDI_STATUS_NVM_TIMEOUT 4
 #define PDI_STATUS_COLLISION 5
 
+#define PDI_GUARD_TIME 1
+
 extern volatile uchar pdiState;
 
-uchar pdiInit();
-void pdiCleanup(uchar keep_reset);
-void pdiEnableTimerClock();
-void pdiDisableTimerClock();
-uchar pdiTimerClockEnabled();
-void pdiSetClk1();
-void pdiSetClk0();
-void pdiSetData1();
-void pdiSetData0();
-void pdiSetDataIn();
-uchar pdiGetData();
+uchar pdiConnect();
+void pdiDisconnect(uchar keep_reset);
+uchar pdiEnterProgrammingMode();
 uchar pdiWaitNVM();
 uchar pdiReadBlock(uint32_t addr,uchar* data,uchar len);
-void pdiSendIdle();
-void pdiSendBreak();
 uchar byteParity(uchar b);
 void pdiSendByte(uchar b);
 void pdiSendBytes(uchar* ptr,uchar count);

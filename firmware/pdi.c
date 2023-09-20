@@ -26,10 +26,6 @@
 #endif
 #include <util/delay.h>
 
-uchar pdi_nvmbusy=0;
-
-PROGMEM const uchar pdi_key[8]={0xFF,0x88,0xD8,0xCD,0x45,0xAB,0x89,0x12};
-
 /* From V-USB usbdrv.h
 
 Interrupt latency:
@@ -54,6 +50,10 @@ USB messages, even if they address another (low-speed) device on the same bus.
 If the clock frequency on PDI_CLK is lower than approximately 10kHz, this is regarded as inactivity on the clock line. This will automatically disable the PDI. If not disabled by a fuse, the reset function of the Reset (PDI_CLK) pin is enabled again. This also means that the minimum programming frequency is approximately 10kHz
 
 */
+
+uchar pdi_nvmbusy=0;
+
+PROGMEM const uchar pdi_key[8]={0xFF,0x88,0xD8,0xCD,0x45,0xAB,0x89,0x12};
 
 #define pdiIdleMode         0
 #define pdiTransmitMode     1
@@ -246,21 +246,36 @@ uchar pdiReadByte(uchar timeout,uchar *result)
 
 }
 
-uchar pdiInit()
+uchar pdiConnect()
 {
 
+    /* AFAIU, the only way to connect MOSI and MISO together 
+    * for PDI communication, is to tri-state the pins and enable 
+    * them when they're needed ( Tx - MOSI, Rx - MISO ), as the
+    * PDI_DATA pin has an internal pull resistor when PDI is enabled.
+    *
+    * Now, when the SPI is enabled in Master Mode,  the input pin 
+    * (MISO) is automatically configured, and, AFAIU, the only way
+    * to tri-state it, during SPI transmision, is to use a buffer 
+    * for to provide HiZ ( i.e. one port of a 74HCT125N ).
+    */
+    
+    /* Tri-state MISO pin connected to 74HCT125N using
+    *  SS pin which is also connected to 74HCT125N . */
     PDI_DDR |= (1 << PDI_RST);
     PDI_OUT |= (1 << PDI_RST);
 
+    /* enable pullup on MISO for improved noise immunity */
     PDI_OUT |= (1 << PDI_MISO);
 
+    /* Transmit  */ 
     pdiEnableCount = 6 + 1;
 
     SPCR = (1 << SPR1) | (1 << SPR0) | (1 << SPE) | (1 << MSTR) | (1 << SPIE) | (1 << CPOL) | (1 << CPHA) | (1 << DORD);
 
     PDI_DDR |= (1 << PDI_MOSI);
     PDI_OUT &= ~(1 << PDI_MOSI);
-    _delay_ms(10);
+    _delay_ms(5);
 
     SPDR = 0xFF;
 
@@ -270,8 +285,10 @@ uchar pdiInit()
 
     while(pdiEnableCount);
 
+    /* MOSI HiZ */
     PDI_DDR &= ~(1 << PDI_MOSI);
     PDI_OUT &= ~(1 << PDI_MOSI);
+    
 
     // Guard Time 64 idle bits ( 8 Bytes )
     pdiSendByte(XNVM_PDI_STCS_INSTR | XOCD_CTRL_REGISTER_ADDRESS);
@@ -280,40 +297,18 @@ uchar pdiInit()
     // pdiSendByte(1);
 
     // The following works on all ATXmega ?
-    pdiSendByte(XNVM_PDI_STCS_INSTR | XOCD_CTRL_REGISTER_ADDRESS | 1);
+    pdiSendByte(XNVM_PDI_STCS_INSTR | XOCD_CTRL_REGISTER_ADDRESS | PDI_GUARD_TIME);
 
-    uchar value;
+    uchar guardTime;
     pdiSendByte(XNVM_PDI_LDCS_INSTR | XOCD_CTRL_REGISTER_ADDRESS);
-    if (pdiReadByte(6, &value) == PDI_STATUS_OK) {
-
-      // Check Guard time ...
+    if (pdiReadByte(6, &guardTime) == PDI_STATUS_OK) {
+      return guardTime == PDI_GUARD_TIME;
     }
 
-    pdiSendByte(XNVM_PDI_STCS_INSTR | XOCD_STATUS_REGISTER_ADDRESS );
-    pdiSendByte(0xFD);
-
-    pdiSendByte(XNVM_PDI_LDCS_INSTR | XOCD_STATUS_REGISTER_ADDRESS);
-    pdiReadByte(6, &value);
-
-    pdiSendByte(XNVM_PDI_STCS_INSTR | XOCD_RESET_REGISTER_ADDRESS);
-    pdiSendByte(0x59);
-
-    uchar buf[9];
-    buf[0]=XNVM_PDI_KEY_INSTR;
-    memcpy_P(&buf[1],pdi_key,8);
-    pdiSendBytes(buf,9);
-
-    pdiSendByte(XNVM_PDI_LDCS_INSTR | XOCD_STATUS_REGISTER_ADDRESS);
-    pdiReadByte(6, &value);
-
-    pdiSendByte(XNVM_PDI_LDCS_INSTR | XOCD_STATUS_REGISTER_ADDRESS);
-    pdiReadByte(6, &value);
-
-    // return pdiWaitNVM();
-    return PDI_STATUS_NVM_TIMEOUT;
+    return 1;
 }
 
-void pdiCleanup(uchar keep_reset)
+void pdiDisconnect(uchar keep_reset)
 {
 
     pdiResetDev(0);
@@ -348,6 +343,27 @@ void pdiCleanup(uchar keep_reset)
     }
 }
 
+uchar pdiEnterProgrammingMode(){
+
+    uchar status;
+
+    pdiSendByte(XNVM_PDI_STCS_INSTR | XOCD_STATUS_REGISTER_ADDRESS );
+    pdiSendByte(0xFD);
+
+    pdiSendByte(XNVM_PDI_LDCS_INSTR | XOCD_STATUS_REGISTER_ADDRESS);
+    pdiReadByte(6, &status);
+
+    pdiSendByte(XNVM_PDI_STCS_INSTR | XOCD_RESET_REGISTER_ADDRESS);
+    pdiSendByte(0x59);
+
+    uchar buf[9];
+    buf[0]=XNVM_PDI_KEY_INSTR;
+    memcpy_P(&buf[1],pdi_key,8);
+    pdiSendBytes(buf,9);
+    
+    return pdiWaitNVM();
+}
+
 void pdiSendBytes(uchar* ptr,uchar count)
 {
     for(;count>0;count--,ptr++)
@@ -366,22 +382,23 @@ void pdiSendBytes(uchar* ptr,uchar count)
     // return ret;
 // }
 
-// uchar pdiWaitNVM()
-// {
-    // uchar retry=100;
-    // for(;retry>0;retry--)
-    // {
-        // uchar status;
-        // if (pdiReadCtrl(XNVM_CONTROLLER_BASE+XNVM_DATA_BASE
-                    // +XNVM_CONTROLLER_STATUS_REG_OFFSET, &status)==PDI_STATUS_OK)
-        // if ((status & XNVM_NVM_BUSY)==0)
-        // {
-            // pdi_nvmbusy=0;
-            // return PDI_STATUS_OK;
-        // }
-    // }
-    // return PDI_STATUS_NVM_TIMEOUT;
-// }
+uchar pdiWaitNVM()
+{
+    uchar retry=10;
+    for(;retry>0;retry--)
+    {
+        uchar status;
+        pdiSendByte(XNVM_PDI_LDCS_INSTR | XOCD_STATUS_REGISTER_ADDRESS);
+        pdiReadByte(6, &status);
+
+        if ((status & XNVM_NVM_BUSY)==0)
+        {
+            pdi_nvmbusy=0;
+            return PDI_STATUS_OK;
+        }
+    }
+    return PDI_STATUS_NVM_TIMEOUT;
+}
 
 // uchar pdiWriteCtrl(uint32_t addr,uint8_t value)
 // {

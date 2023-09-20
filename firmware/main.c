@@ -288,19 +288,23 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
 
 #ifdef __PDI__
 
-            } else if (data[1] == USBASP_FUNC_PDI_CONNECT) {
-                if ((replyBuffer[0]=pdiInit())==PDI_STATUS_OK)
+            } else if (data[1] == USBASP_FUNC_PDI_CONNECT) {               
                 ledRedOn();
+                replyBuffer[0] = pdiConnect();
                 len=1;
                 
             } else if (data[1] == USBASP_FUNC_PDI_DISCONNECT) {
                 ledRedOff();
-                pdiCleanup(data[2]);
+                pdiDisconnect(data[2]);
                 
-            } else if (data[1] == USBASP_FUNC_PDI_SEND) {
+            } else if (data[1] == USBASP_FUNC_PDI_ENABLEPROG) {
+                replyBuffer[0] = pdiEnterProgrammingMode();
+                len = 1;
+                
+            } else if (data[1] == USBASP_FUNC_PDI_WRITE) {
                 prog_nbytes = (data[7] << 8) | data[6];
                 prog_blockflags = data[2];
-                prog_state = PROG_STATE_PDI_SEND;
+                prog_state = PROG_STATE_PDI_WRITE;
                 prog_buf_pos = 0;
                 len = USB_NO_MSG; /* multiple out */
                 
@@ -459,7 +463,7 @@ uchar usbFunctionWrite(uchar *data, uchar len) {
             && (prog_state != PROG_STATE_TPI_WRITE)
 #endif            
 #ifdef __PDI__
-            && (prog_state != PROG_STATE_PDI_SEND)
+            && (prog_state != PROG_STATE_PDI_WRITE)
 #endif            
             && (prog_state != PROG_STATE_SET_REPORT)) {
         return 0xff;
@@ -484,7 +488,7 @@ uchar usbFunctionWrite(uchar *data, uchar len) {
 
 #ifdef __PDI__
 
-    if (prog_state == PROG_STATE_PDI_SEND)
+    if (prog_state == PROG_STATE_PDI_WRITE)
     {
         memmove(&prog_buf[prog_buf_pos],data,len);
         prog_buf_pos += len;

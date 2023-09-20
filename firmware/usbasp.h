@@ -36,8 +36,9 @@
 // PDI:
 #define USBASP_FUNC_PDI_CONNECT         17
 #define USBASP_FUNC_PDI_DISCONNECT      18
-#define USBASP_FUNC_PDI_READ            19
-#define USBASP_FUNC_PDI_SEND            20
+#define USBASP_FUNC_PDI_ENABLEPROG      19
+#define USBASP_FUNC_PDI_READ            20
+#define USBASP_FUNC_PDI_WRITE           21
 // UART:
 #define USBASP_FUNC_UART_CONFIG         60
 #define USBASP_FUNC_UART_DISABLE        63
@@ -65,7 +66,7 @@
 #define PROG_STATE_TPI_READ             5
 #define PROG_STATE_TPI_WRITE            6
 #define PROG_STATE_PDI_READ             7
-#define PROG_STATE_PDI_SEND             8
+#define PROG_STATE_PDI_WRITE            8
 #define PROG_STATE_SET_REPORT           9
 
 /* pdi state */
