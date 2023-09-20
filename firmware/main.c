@@ -301,6 +301,12 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
                 replyBuffer[0] = pdiEnterProgrammingMode();
                 len = 1;
                 
+            } else if (data[1] == USBASP_FUNC_PDI_READ) {
+                memmove(&prog_address, data+2, 4);
+                prog_nbytes = (data[7] << 8) | data[6];
+                prog_state = PROG_STATE_PDI_READ;
+                len = USB_NO_MSG; /* multiple in */              
+
             } else if (data[1] == USBASP_FUNC_PDI_WRITE) {
                 prog_nbytes = (data[7] << 8) | data[6];
                 prog_blockflags = data[2];
@@ -308,11 +314,6 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
                 prog_buf_pos = 0;
                 len = USB_NO_MSG; /* multiple out */
                 
-            } else if (data[1] == USBASP_FUNC_PDI_READ) {
-                memmove(&prog_address,data+2,4);
-                prog_nbytes = (data[7] << 8) | data[6];
-                prog_state = PROG_STATE_PDI_READ;
-                len = USB_NO_MSG; /* multiple in */              
 
 #endif
 
@@ -387,13 +388,16 @@ uchar usbFunctionRead(uchar *data, uchar len) {
     /* check if programmer is in correct read state */
     if ((prog_state != PROG_STATE_READFLASH) 
             && (prog_state != PROG_STATE_READEEPROM) 
+
 #ifdef __TPI__
             && (prog_state != PROG_STATE_TPI_READ)
 #endif
+
 #ifdef __PDI__
             && (prog_state != PROG_STATE_PDI_READ)
 #endif
-            ) {
+            ) 
+    {
         return 0xff;
     }
 
@@ -414,16 +418,15 @@ uchar usbFunctionRead(uchar *data, uchar len) {
     /* fill packet PDI mode */
     if(prog_state == PROG_STATE_PDI_READ)
     {
-        // pdiDisableTimerClock();
-        // pdiSendIdle();
-        // if (pdi_nvmbusy)
-        // pdiWaitNVM();
-        // uchar ret=pdiReadBlock(prog_address, data, len);
-        // pdiEnableTimerClock();
-        // if (ret!=PDI_STATUS_OK)
-        // return 0;
+        if (pdi_nvmbusy) {           
+            pdiWaitNVM();            
+        }
+
+        if(pdiReadBlock(prog_address, data, len) != PDI_STATUS_OK) {
+            len = 0xFF;
+        }
+       
         prog_address += len;
-        return len;
     }
 
 #endif
@@ -495,14 +498,17 @@ uchar usbFunctionWrite(uchar *data, uchar len) {
         prog_nbytes -= len;
         if (prog_nbytes==0)
         {
-            // pdiDisableTimerClock();
-            // pdiSendIdle();
-            if ((prog_blockflags & USBASP_PDI_WAIT_BUSY) && pdi_nvmbusy)
-            // pdiWaitNVM();
+            if ((prog_blockflags & USBASP_PDI_WAIT_BUSY) && pdi_nvmbusy) {
+                
+                pdiWaitNVM();
+                
+            }
             pdiSendBytes(prog_buf,prog_buf_pos);
-            if (prog_blockflags & USBASP_PDI_MARK_BUSY)
-            pdi_nvmbusy=1;
-            // pdiEnableTimerClock();
+            if (prog_blockflags & USBASP_PDI_MARK_BUSY) {
+                
+                pdi_nvmbusy=1;
+                
+            }
             prog_state = PROG_STATE_IDLE;
             return 1;
         }

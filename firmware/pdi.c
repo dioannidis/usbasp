@@ -53,7 +53,8 @@ If the clock frequency on PDI_CLK is lower than approximately 10kHz, this is reg
 
 uchar pdi_nvmbusy=0;
 
-PROGMEM const uchar pdi_key[8]={0xFF,0x88,0xD8,0xCD,0x45,0xAB,0x89,0x12};
+/* PDI Activation Key in reverse */
+PROGMEM const uchar pdiActivationKey[8]={0xFF, 0x88, 0xD8, 0xCD, 0x45, 0xAB, 0x89, 0x12};
 
 #define pdiIdleMode         0
 #define pdiTransmitMode     1
@@ -246,8 +247,11 @@ uchar pdiReadByte(uchar timeout,uchar *result)
 
 }
 
-uchar pdiConnect()
+void pdiSendBytes(uchar* ptr,uchar count)
 {
+    for(;count>0;count--,ptr++)
+    pdiSendByte(*ptr);
+}
 
     /* AFAIU, the only way to connect MOSI and MISO together 
     * for PDI communication, is to tri-state the pins and enable 
@@ -258,8 +262,16 @@ uchar pdiConnect()
     * (MISO) is automatically configured, and, AFAIU, the only way
     * to tri-state it, during SPI transmision, is to use a buffer 
     * for to provide HiZ ( i.e. one port of a 74HCT125N ).
-    */
-    
+    */   
+
+uchar pdiConnect()
+{
+
+    /* Transmit  */ 
+    pdiEnableCount = 6 + 1;
+
+    SPCR = (1 << SPR1) | (1 << SPR0) | (1 << SPE) | (1 << MSTR) | (1 << SPIE) | (1 << CPOL) | (1 << CPHA) | (1 << DORD);
+
     /* Tri-state MISO pin connected to 74HCT125N using
     *  SS pin which is also connected to 74HCT125N . */
     PDI_DDR |= (1 << PDI_RST);
@@ -267,11 +279,6 @@ uchar pdiConnect()
 
     /* enable pullup on MISO for improved noise immunity */
     PDI_OUT |= (1 << PDI_MISO);
-
-    /* Transmit  */ 
-    pdiEnableCount = 6 + 1;
-
-    SPCR = (1 << SPR1) | (1 << SPR0) | (1 << SPE) | (1 << MSTR) | (1 << SPIE) | (1 << CPOL) | (1 << CPHA) | (1 << DORD);
 
     PDI_DDR |= (1 << PDI_MOSI);
     PDI_OUT &= ~(1 << PDI_MOSI);
@@ -283,6 +290,7 @@ uchar pdiConnect()
     PDI_OUT &= ~(1 << PDI_SCK);
     PDI_DDR |= (1 << PDI_SCK);
 
+    /* Wait for PDI trasmit/receive to finnish */
     while(pdiEnableCount);
 
     /* MOSI HiZ */
@@ -311,7 +319,15 @@ uchar pdiConnect()
 void pdiDisconnect(uchar keep_reset)
 {
 
-    pdiResetDev(0);
+    /* To end keeping device in reset, write a 
+    * data value different from the RESET Signature 
+    * to the RESET register. */
+    uchar buf[2];
+    buf[0] = XNVM_PDI_STCS_INSTR | XOCD_RESET_REGISTER_ADDRESS;
+    buf[1] = 0;
+    pdiSendBytes(buf, 2);
+   
+    /* Wait for PDI trasmit/receive to finnish */
     while(pdiState);
 
     SPCR = 0;
@@ -326,7 +342,6 @@ void pdiDisconnect(uchar keep_reset)
     pdiState = pdiIdleMode;
     pdiTransmitData = 0;
     pdiReceiveData = 0;
-
 
     switch(keep_reset) {
         case EXIT_RESET_DISABLED:
@@ -346,41 +361,30 @@ void pdiDisconnect(uchar keep_reset)
 uchar pdiEnterProgrammingMode(){
 
     uchar status;
+    uchar buf[9];
 
+    /* Set the STATUS PDI register to a known state
+    *  and reading it back, to be ready to start
+    *  to poll the status of the NVM busy bit. */    
     pdiSendByte(XNVM_PDI_STCS_INSTR | XOCD_STATUS_REGISTER_ADDRESS );
     pdiSendByte(0xFD);
-
     pdiSendByte(XNVM_PDI_LDCS_INSTR | XOCD_STATUS_REGISTER_ADDRESS);
     pdiReadByte(6, &status);
 
-    pdiSendByte(XNVM_PDI_STCS_INSTR | XOCD_RESET_REGISTER_ADDRESS);
-    pdiSendByte(0x59);
-
-    uchar buf[9];
-    buf[0]=XNVM_PDI_KEY_INSTR;
-    memcpy_P(&buf[1],pdi_key,8);
-    pdiSendBytes(buf,9);
+    /* Write the RESET Signature to the RESET register
+    *  to force the device into reset. */
+    buf[0] = XNVM_PDI_STCS_INSTR | XOCD_RESET_REGISTER_ADDRESS;
+    buf[1] = XOCD_RESET_SIGNATURE;
+    pdiSendBytes(buf, 2);
     
+    /* Send PDI ACTIVATION KEY to activate the NVM interfaces. */
+    buf[0] = XNVM_PDI_KEY_INSTR;
+    memcpy_P(&buf[1], pdiActivationKey, 8);
+    pdiSendBytes(buf, 9);
+    
+    /* Poll the NVMEN busy bit. */
     return pdiWaitNVM();
 }
-
-void pdiSendBytes(uchar* ptr,uchar count)
-{
-    for(;count>0;count--,ptr++)
-    pdiSendByte(*ptr);
-}
-
-// uchar pdiReadCtrl(uint32_t addr, uchar *value)
-// {
-    // uchar ret;
-    // uchar buf[5];
-
-    // buf[0]=XNVM_PDI_LDS_INSTR | XNVM_PDI_LONG_ADDRESS_MASK | XNVM_PDI_BYTE_DATA_MASK;
-    // memmove(buf+1,&addr,4);
-    // pdiSendBytes(buf,5);
-    // ret = pdiReadByte(100,value);
-    // return ret;
-// }
 
 uchar pdiWaitNVM()
 {
@@ -400,63 +404,65 @@ uchar pdiWaitNVM()
     return PDI_STATUS_NVM_TIMEOUT;
 }
 
-// uchar pdiWriteCtrl(uint32_t addr,uint8_t value)
-// {
-    // uchar cmd[6];
-    // cmd[0]= XNVM_PDI_STS_INSTR | XNVM_PDI_LONG_ADDRESS_MASK | XNVM_PDI_BYTE_DATA_MASK;
-    // memmove(cmd+1,&addr,4);
-    // cmd[5]=value;
-    // pdiSendBytes(cmd,6);
-    // return PDI_STATUS_OK;
-// }
-
-uchar pdiResetDev(uchar reset)
+uchar pdiReadCtrl(uint32_t addr, uchar *value)
 {
-    uchar buf[2];
-    buf[0]=XNVM_PDI_STCS_INSTR | XOCD_RESET_REGISTER_ADDRESS;
-    buf[1]=reset?XOCD_RESET_SIGNATURE:0;
-    pdiSendBytes(buf,2);
+    uchar ret;
+    uchar buf[5];
+
+    buf[0]=XNVM_PDI_LDS_INSTR | XNVM_PDI_LONG_ADDRESS_MASK | XNVM_PDI_BYTE_DATA_MASK;
+    memmove(buf+1,&addr,4);
+    pdiSendBytes(buf,5);
+    ret = pdiReadByte(6,value);
+    return ret;
+}
+
+uchar pdiWriteCtrl(uint32_t addr, uint8_t value)
+{
+    uchar cmd[6];
+    cmd[0] = XNVM_PDI_STS_INSTR | XNVM_PDI_LONG_ADDRESS_MASK | XNVM_PDI_BYTE_DATA_MASK;
+    memmove(cmd + 1, &addr, 4);
+    cmd[5] = value;
+    pdiSendBytes(cmd, 6);
     return PDI_STATUS_OK;
 }
 
-// uchar pdiSetPointer(uint32_t addr)
-// {
-    // uchar cmd[5];
-    // cmd[0]=XNVM_PDI_ST_INSTR | XNVM_PDI_LD_PTR_ADDRESS_MASK | XNVM_PDI_LONG_DATA_MASK;
-    // memmove(cmd+1,&addr,4);
-    // pdiSendBytes(cmd,5);
-    // return 0;
-// }
+uchar pdiSetPointer(uint32_t addr)
+{
+    uchar cmd[5];
+    cmd[0] = XNVM_PDI_ST_INSTR | XNVM_PDI_LD_PTR_ADDRESS_MASK | XNVM_PDI_LONG_DATA_MASK;
+    memmove(cmd + 1, &addr, 4);
+    pdiSendBytes(cmd, 5);
+    return 0;
+}
 
-// uchar pdiReadBlock(uint32_t addr,uchar* data,uchar len)
-// {
-    // uchar ret=PDI_STATUS_OK;
+uchar pdiReadBlock(uint32_t address, uchar* dataBuf, uchar lenAsked)
+{
+    uchar ret=PDI_STATUS_OK;
 
-    // uchar retry=20;
-    // for(;retry>0;retry--)
-    // {
-        // pdiWriteCtrl(XNVM_DATA_BASE+XNVM_CONTROLLER_BASE
-        // +XNVM_CONTROLLER_CMD_REG_OFFSET,XNVM_CMD_READ_NVM_PDI);
-        // pdiSetPointer(addr);
+    uchar retry=20;
+    for(;retry>0;retry--)
+    {
+        pdiWriteCtrl(XNVM_DATA_BASE+XNVM_CONTROLLER_BASE+XNVM_CONTROLLER_CMD_REG_OFFSET, XNVM_CMD_READ_NVM_PDI);
+        pdiSetPointer(address);
 
-        // if (len>1)
-        // {
-            // pdiSendByte(XNVM_PDI_REPEAT_INSTR | XNVM_PDI_BYTE_DATA_MASK);
-            // pdiSendByte(len-1);
-        // }
+        if (lenAsked>1)
+        {
+            pdiSendByte(XNVM_PDI_REPEAT_INSTR | XNVM_PDI_BYTE_DATA_MASK);
+            pdiSendByte(lenAsked-1);
+        }
 
-        // pdiSendByte(XNVM_PDI_LD_INSTR | XNVM_PDI_LD_PTR_STAR_INC_MASK | XNVM_PDI_BYTE_DATA_MASK);
+        pdiSendByte(XNVM_PDI_LD_INSTR | XNVM_PDI_LD_PTR_STAR_INC_MASK | XNVM_PDI_BYTE_DATA_MASK);
 
-        // uchar *dst=data;
-        // uchar i;
-        // for(i=0;i<len;i++,dst++)
-        // {
-            // ret=pdiReadByte(200,dst);
-            // if (ret!=PDI_STATUS_OK) break;
-        // }
+        uchar *dst=dataBuf;
+        uchar i;
+        for(i=0;i<lenAsked;i++,dst++)
+        {
+            ret=pdiReadByte(10, dst);
+            if (ret!=PDI_STATUS_OK) break;
+        }
         
-        // if (ret==PDI_STATUS_OK) break;
-    // }
+        if (ret==PDI_STATUS_OK) break;
+    }
 
-    // return ret;
-// }
+    return ret;
+}
