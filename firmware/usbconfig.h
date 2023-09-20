@@ -138,20 +138,12 @@ section at the end of this file).
  * The value is in milliamperes. [It will be divided by two since USB
  * communicates power requirements in units of 2 mA.]
  */
-#ifdef __HIDUART__
 #define USB_CFG_IMPLEMENT_FN_WRITE      1
-#else
-#define USB_CFG_IMPLEMENT_FN_WRITE      0
-#endif    
 /* Set this to 1 if you want usbFunctionWrite() to be called for control-out
  * transfers. Set it to 0 if you don't need it and want to save a couple of
  * bytes.
  */
-#ifdef __HIDUART__
 #define USB_CFG_IMPLEMENT_FN_READ       1
-#else
-#define USB_CFG_IMPLEMENT_FN_READ       0
-#endif    
 /* Set this to 1 if you need to send control replies which are generated
  * "on the fly" when usbFunctionRead() is called. If you only want to send
  * data from a static buffer, set it to 0 and return the data from
