@@ -2,6 +2,7 @@
  * pdi.h - part of USBasp
  *
  * Author.........: szu ( from http://szulat.blogspot.com/ )
+ *                  Dimitrios Chr. Ioannidis ( d.ioannidis@nephelae.eu )
  * Description....: Provides functions for communication/programming
  *                  over PDI interface
  * Licence........: GNU GPL v2 (see Readme.txt)
@@ -33,8 +34,8 @@
 #define PDI_STATUS_NVM_TIMEOUT 4
 #define PDI_STATUS_COLLISION 5
 
-/* 64 Idle Bits ( 8 Bytes ) */
-#define PDI_GUARD_TIME 1
+/* 32 Idle Bits ( 4 Bytes ) */
+#define PDI_GUARD_TIME 2
 
 extern uchar pdi_nvmbusy;
 extern volatile uchar pdiState;

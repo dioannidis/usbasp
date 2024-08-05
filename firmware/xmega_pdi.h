@@ -94,10 +94,10 @@
 
 #define XNVM_FLASH_PAGE_SIZE			512			//
 
-#define XNVM_CONTROLLER_BASE 0x01C0               //!< NVM Controller register base address.
-#define XNVM_CONTROLLER_CMD_REG_OFFSET 0x0A       //!< NVM Controller Command Register offset.
-#define XNVM_CONTROLLER_STATUS_REG_OFFSET 0x0F    //!< NVM Controller Status Register offset.
-#define XNVM_CONTROLLER_CTRLA_REG_OFFSET 0x0B     //!< NVM Controller Control Register A offset.
+#define XNVM_CONTROLLER_BASE              0x01C0  //!< NVM Controller register base address.
+#define XNVM_CONTROLLER_CMD_REG_OFFSET    0x0A    //!< NVM Controller Command Register offset.
+#define XNVM_CONTROLLER_STATUS_REG_OFFSET 0x04    //!< NVM Controller Status Register offset.
+#define XNVM_CONTROLLER_CTRLA_REG_OFFSET  0x0B    //!< NVM Controller Control Register A offset.
 
 #define XNVM_CTRLA_CMDEX (1 << 0)                 //!< CMDEX bit offset.
 #define XNVM_NVMEN (1 << 1)                       //!< NVMEN bit offset.
@@ -106,7 +106,7 @@
 #define XOCD_STATUS_REGISTER_ADDRESS 0x00         //!< PDI status register address.
 #define XOCD_RESET_REGISTER_ADDRESS  0x01         //!< PDI reset register address.
 #define XOCD_RESET_SIGNATURE         0x59         //!< PDI reset Signature.
-#define XOCD_FCMR_ADDRESS 0x05
-#define XOCD_CTRL_REGISTER_ADDRESS  0x02
+#define XOCD_FCMR_ADDRESS            0x05
+#define XOCD_CTRL_REGISTER_ADDRESS   0x02
 
 #endif

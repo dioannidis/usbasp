@@ -291,7 +291,8 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
             } else if (data[1] == USBASP_FUNC_PDI_CONNECT) {               
                 ledRedOn();
                 replyBuffer[0] = pdiConnect();
-                len=1;
+                replyBuffer[1] = PDI_GUARD_TIME;
+                len = 2;
                 
             } else if (data[1] == USBASP_FUNC_PDI_DISCONNECT) {
                 ledRedOff();
@@ -302,7 +303,7 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
                 len = 1;
                 
             } else if (data[1] == USBASP_FUNC_PDI_READ) {
-                memmove(&prog_address, data+2, 4);
+                memmove(&prog_address, data + 2, 4);
                 prog_nbytes = (data[7] << 8) | data[6];
                 prog_state = PROG_STATE_PDI_READ;
                 len = USB_NO_MSG; /* multiple in */              

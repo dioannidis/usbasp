@@ -1,7 +1,8 @@
 /*
 * pdi.c - part of USBasp
 *
-* Author.........: szu ( from http://szulat.blogspot.com/ )
+* Author.........:  szu ( from http://szulat.blogspot.com/ )
+*                   Dimitrios Chr. Ioannidis ( d.ioannidis@nephelae.eu )
 * Description....: Provides functions for communication/programming
 *                  over PDI interface
 * Licence........: GNU GPL v2 (see Readme.txt)
@@ -51,10 +52,10 @@ If the clock frequency on PDI_CLK is lower than approximately 10kHz, this is reg
 
 */
 
-uchar pdi_nvmbusy=0;
+uchar pdi_nvmbusy;
 
 /* PDI Activation Key in reverse */
-PROGMEM const uchar pdiActivationKey[8]={0xFF, 0x88, 0xD8, 0xCD, 0x45, 0xAB, 0x89, 0x12};
+PROGMEM const uchar pdiActivationKey[8] = {0xFF, 0x88, 0xD8, 0xCD, 0x45, 0xAB, 0x89, 0x12};
 
 #define pdiIdleMode         0
 #define pdiTransmitMode     1
@@ -75,17 +76,21 @@ uchar pdiSPIState = 1;
 
 volatile uchar pdiReceiveData = 0;
 volatile uchar pdiTimeout;
-volatile uchar pdiDataByteOne;
-volatile uchar pdiDataByteTwo;
-volatile uchar pdiDataByteThree;
+
+uchar* rcvdData;
+uint8_t rcvdByteRequest;
+
+uchar rcvdSPIByte;
+uchar rcvdByteCount;
+uchar rcvdByteBitIdx;
+uchar rcvdStartBitFound;
+uchar bitMask;
 
 #define pdiReceiveStart             2
-#define pdiReceiveFirstByte         4
-#define pdiReceiveSecondByte        8
-#define pdiReceiveThirdByte         16
-#define pdiReceiveFinish            32
+#define pdiReceiveBytes             4
+#define pdiReceiveFinish            8
 
-volatile uchar pdiEnableCount = 0;
+volatile uchar pdiEnableCount;
 
 ISR(SPI_STC_vect, ISR_NOBLOCK) {
 
@@ -126,25 +131,72 @@ ISR(SPI_STC_vect, ISR_NOBLOCK) {
             pdiSPIState = (pdiSPIState << 1);
 
             if (pdiSPIState == pdiReceiveStart){
+                
                 PDI_OUT &= ~(1 << PDI_RST);
-            } else if (pdiSPIState == pdiReceiveFirstByte) {
-                pdiDataByteOne = SPDR;
-                if (pdiDataByteOne == 0xFF) {
-                    pdiSPIState = pdiReceiveStart;
+                rcvdSPIByte = SPDR;
+                
+            } else if (pdiSPIState == pdiReceiveBytes) {
+                
+                pdiSPIState = pdiReceiveStart;
+                rcvdSPIByte = SPDR;
+
+                for (bitMask = (1 << 7); bitMask != 0; bitMask >>= 1) {
+
+                    if (!rcvdStartBitFound) {
+                        if (rcvdSPIByte & bitMask) {
+                            continue;
+                        } else {
+                            rcvdStartBitFound = 1;
+                            continue;
+                        }
+                    }
+
+                    if (rcvdByteBitIdx++ < 8) {
+                        *rcvdData = (*rcvdData) << 1;
+                        if (rcvdSPIByte & bitMask) { 
+                            (*rcvdData)++;
+                        }
+                    } else {
+
+                        uint8_t rvrsDataByte = 0;
+                        if (*rcvdData & 0x01) rvrsDataByte |= 0x80;
+                        if (*rcvdData & 0x02) rvrsDataByte |= 0x40;
+                        if (*rcvdData & 0x04) rvrsDataByte |= 0x20;
+                        if (*rcvdData & 0x08) rvrsDataByte |= 0x10;
+                        if (*rcvdData & 0x10) rvrsDataByte |= 0x08;
+                        if (*rcvdData & 0x20) rvrsDataByte |= 0x04;
+                        if (*rcvdData & 0x40) rvrsDataByte |= 0x02;
+                        if (*rcvdData & 0x80) rvrsDataByte |= 0x01;
+
+                        *rcvdData = rvrsDataByte;
+                        rcvdData++;
+                        rcvdByteCount++;
+                        rcvdStartBitFound = 0;
+                        rcvdByteBitIdx = 0;
+
+                        if (bitMask != 0) bitMask >>= 1; // skip parity cause maybe its 0 and gets misinterpreted as startbit
+                    }
+
                 }
-                if (!pdiTimeout) pdiSPIState = pdiReceiveThirdByte;
-            } else if (pdiSPIState == pdiReceiveSecondByte) {
-                pdiDataByteTwo = SPDR;
-            } else if (pdiSPIState == pdiReceiveThirdByte) {
-                pdiDataByteThree = SPDR;
-                PDI_OUT |= (1 << PDI_RST);
+                
+                if ((!pdiTimeout) || (rcvdByteRequest == rcvdByteCount)) pdiSPIState = pdiReceiveBytes;
+                
             } else if (pdiSPIState == pdiReceiveFinish) {
+                
+                PDI_OUT |= (1 << PDI_RST);
+                
+                rcvdByteCount = 0;
+                rcvdByteRequest = 0;
+                rcvdStartBitFound = 0;
+                rcvdByteBitIdx = 0;
+                
                 pdiSPIState = 1;
-                pdiState = 0;
                 pdiReceiveData = 0;
+                pdiState = 0;
             }
 
         }
+
     }
 
 
@@ -167,59 +219,17 @@ void pdiSendByte(uchar byte)
     pdiTransmitData = 1;
     pdiState = pdiTransmitMode;
     usbDisableAllRequests();
-
 }
 
-uint8_t rcvdByte = 0;
-uint8_t rcvdByteIndex = 0;
-uint8_t foundStartBit = 0;
-
-void extractByteFromSPI(uchar byte) {
-
-    uint8_t mask;
-    for (mask = (1 << 7); mask != 0; mask >>= 1) {
-
-        if (!foundStartBit) {
-            if (byte & mask) {
-                continue;
-            } else {
-                foundStartBit = 1;
-                continue;
-            }
-        }
-
-        if (rcvdByteIndex++ < 8) {
-            rcvdByte = rcvdByte << 1;
-            if (byte & mask) {
-                rcvdByte++;
-            }
-        } else {
-            break;
-        }
-    }
-
-}
-
-uchar reverseByte(uchar byte)
+uchar pdiReadByte(uchar timeout, uchar* data, uchar len)
 {
-    uchar rvrsByte = 0;
-    if (byte & 0x01) rvrsByte |= 0x80;
-    if (byte & 0x02) rvrsByte |= 0x40;
-    if (byte & 0x04) rvrsByte |= 0x20;
-    if (byte & 0x08) rvrsByte |= 0x10;
-    if (byte & 0x10) rvrsByte |= 0x08;
-    if (byte & 0x20) rvrsByte |= 0x04;
-    if (byte & 0x40) rvrsByte |= 0x02;
-    if (byte & 0x80) rvrsByte |= 0x01;
-    return(rvrsByte);
-}
-
-uchar pdiReadByte(uchar timeout,uchar *result)
-{
-
-    pdiTimeout = timeout;
 
     while(pdiState);
+
+    pdiTimeout = timeout;
+    rcvdByteRequest = len;
+    rcvdData = data;
+
     pdiReceiveData = 1;
     pdiState = pdiReceiveMode;    
     usbDisableAllRequests();
@@ -232,22 +242,13 @@ uchar pdiReadByte(uchar timeout,uchar *result)
 
     } else {
 
-        rcvdByte = 0;
-        rcvdByteIndex = 0;
-        foundStartBit = 0;
-
-        extractByteFromSPI(reverseByte(pdiDataByteOne));
-        extractByteFromSPI(reverseByte(pdiDataByteTwo));
-        extractByteFromSPI(reverseByte(pdiDataByteThree));
-
-        *result = reverseByte(rcvdByte);
         return PDI_STATUS_OK;
 
     }
 
 }
 
-void pdiSendBytes(uchar* ptr,uchar count)
+void pdiSendBytes(uchar* ptr, uchar count)
 {
     for(;count>0;count--,ptr++)
     pdiSendByte(*ptr);
@@ -266,11 +267,14 @@ void pdiSendBytes(uchar* ptr,uchar count)
 
 uchar pdiConnect()
 {
+    uchar ret = PDI_STATUS_TIMEOUT;
+    uchar guardTime;
 
     /* Transmit  */ 
     pdiEnableCount = 6 + 1;
 
-    SPCR = (1 << SPR1) | (1 << SPR0) | (1 << SPE) | (1 << MSTR) | (1 << SPIE) | (1 << CPOL) | (1 << CPHA) | (1 << DORD);
+    usbDisableAllRequests();
+    SPCR = (0 << SPR1) | (1 << SPR0) | (1 << SPE) | (1 << MSTR) | (1 << SPIE) | (1 << CPOL) | (1 << CPHA) | (1 << DORD);
 
     /* Tri-state MISO pin connected to 74HCT125N using
     *  SS pin which is also connected to 74HCT125N . */
@@ -282,11 +286,11 @@ uchar pdiConnect()
 
     PDI_DDR |= (1 << PDI_MOSI);
     PDI_OUT &= ~(1 << PDI_MOSI);
-    _delay_ms(5);
+    _delay_ms(1);
 
     SPDR = 0xFF;
 
-    _delay_us(5);
+    while(pdiEnableCount > 6);
     PDI_OUT &= ~(1 << PDI_SCK);
     PDI_DDR |= (1 << PDI_SCK);
 
@@ -296,24 +300,20 @@ uchar pdiConnect()
     /* MOSI HiZ */
     PDI_DDR &= ~(1 << PDI_MOSI);
     PDI_OUT &= ~(1 << PDI_MOSI);
-    
+
+    pdiSendByte(XNVM_PDI_LDCS_INSTR | XOCD_CTRL_REGISTER_ADDRESS);
+    pdiReadByte(75, &guardTime, 1);   
 
     // Guard Time 64 idle bits ( 8 Bytes )
     pdiSendByte(XNVM_PDI_STCS_INSTR | XOCD_CTRL_REGISTER_ADDRESS);
+    pdiSendByte(PDI_GUARD_TIME);
 
-    // Doesn't work ....
-    // pdiSendByte(1);
-
-    // The following works on all ATXmega ?
-    pdiSendByte(XNVM_PDI_STCS_INSTR | XOCD_CTRL_REGISTER_ADDRESS | PDI_GUARD_TIME);
-
-    uchar guardTime;
     pdiSendByte(XNVM_PDI_LDCS_INSTR | XOCD_CTRL_REGISTER_ADDRESS);
-    if (pdiReadByte(6, &guardTime) == PDI_STATUS_OK) {
-      return guardTime == PDI_GUARD_TIME;
+    if (pdiReadByte(75, &guardTime, 1) == PDI_STATUS_OK) {
+      if (guardTime & PDI_GUARD_TIME) ret = PDI_STATUS_OK;
     }
 
-    return 1;
+    return ret;
 }
 
 void pdiDisconnect(uchar keep_reset)
@@ -360,6 +360,7 @@ void pdiDisconnect(uchar keep_reset)
 
 uchar pdiEnterProgrammingMode(){
 
+    uchar ret = PDI_STATUS_NVM_TIMEOUT;
     uchar status;
     uchar buf[9];
 
@@ -369,7 +370,7 @@ uchar pdiEnterProgrammingMode(){
     pdiSendByte(XNVM_PDI_STCS_INSTR | XOCD_STATUS_REGISTER_ADDRESS );
     pdiSendByte(0xFD);
     pdiSendByte(XNVM_PDI_LDCS_INSTR | XOCD_STATUS_REGISTER_ADDRESS);
-    pdiReadByte(6, &status);
+    pdiReadByte(75, &status, 1);
 
     /* Write the RESET Signature to the RESET register
     *  to force the device into reset. */
@@ -382,87 +383,90 @@ uchar pdiEnterProgrammingMode(){
     memcpy_P(&buf[1], pdiActivationKey, 8);
     pdiSendBytes(buf, 9);
     
-    /* Poll the NVMEN busy bit. */
-    return pdiWaitNVM();
-}
-
-uchar pdiWaitNVM()
-{
-    uchar retry=10;
-    for(;retry>0;retry--)
-    {
-        uchar status;
-        pdiSendByte(XNVM_PDI_LDCS_INSTR | XOCD_STATUS_REGISTER_ADDRESS);
-        pdiReadByte(6, &status);
-
-        if ((status & XNVM_NVM_BUSY)==0)
+    /* Confirm if NVM is enabled */
+    pdiSendByte(XNVM_PDI_LDCS_INSTR | XOCD_STATUS_REGISTER_ADDRESS);        
+    if (pdiReadByte(75, &status, 1) == PDI_STATUS_OK) {   
+        if (status & XNVM_NVMEN)
         {
-            pdi_nvmbusy=0;
-            return PDI_STATUS_OK;
-        }
+            ret = PDI_STATUS_OK;
+        }           
     }
-    return PDI_STATUS_NVM_TIMEOUT;
+    
+    return ret;
 }
 
-uchar pdiReadCtrl(uint32_t addr, uchar *value)
+uchar pdiReadCtrl(uint32_t address, uchar *value)
 {
     uchar ret;
     uchar buf[5];
 
-    buf[0]=XNVM_PDI_LDS_INSTR | XNVM_PDI_LONG_ADDRESS_MASK | XNVM_PDI_BYTE_DATA_MASK;
-    memmove(buf+1,&addr,4);
-    pdiSendBytes(buf,5);
-    ret = pdiReadByte(6,value);
+    buf[0] = XNVM_PDI_LDS_INSTR | XNVM_PDI_LONG_ADDRESS_MASK | XNVM_PDI_BYTE_DATA_MASK;
+    memmove(buf + 1, &address, 4);
+    pdiSendBytes(buf, 5);
+    ret = pdiReadByte(100, value, 1);
     return ret;
 }
 
-uchar pdiWriteCtrl(uint32_t addr, uint8_t value)
+uchar pdiWriteCtrl(uint32_t address, uint8_t value)
 {
     uchar cmd[6];
     cmd[0] = XNVM_PDI_STS_INSTR | XNVM_PDI_LONG_ADDRESS_MASK | XNVM_PDI_BYTE_DATA_MASK;
-    memmove(cmd + 1, &addr, 4);
+    memmove(cmd + 1, &address, 4);
     cmd[5] = value;
     pdiSendBytes(cmd, 6);
     return PDI_STATUS_OK;
 }
 
-uchar pdiSetPointer(uint32_t addr)
+uchar pdiSetPointer(uint32_t address)
 {
     uchar cmd[5];
     cmd[0] = XNVM_PDI_ST_INSTR | XNVM_PDI_LD_PTR_ADDRESS_MASK | XNVM_PDI_LONG_DATA_MASK;
-    memmove(cmd + 1, &addr, 4);
+    memmove(cmd + 1, &address, 4);
     pdiSendBytes(cmd, 5);
     return 0;
 }
 
-uchar pdiReadBlock(uint32_t address, uchar* dataBuf, uchar lenAsked)
+uchar pdiReadBlock(uint32_t address, uchar* dataBuf, uchar len)
 {
-    uchar ret=PDI_STATUS_OK;
+    uchar ret = PDI_STATUS_OK;
 
-    uchar retry=20;
-    for(;retry>0;retry--)
+    uchar retry = 20;
+    for(; retry > 0; retry--)
     {
-        pdiWriteCtrl(XNVM_DATA_BASE+XNVM_CONTROLLER_BASE+XNVM_CONTROLLER_CMD_REG_OFFSET, XNVM_CMD_READ_NVM_PDI);
+        pdiReadCtrl(XNVM_DATA_BASE + XNVM_CONTROLLER_BASE + XNVM_CONTROLLER_CMD_REG_OFFSET, dataBuf);
+        pdiReadCtrl(XNVM_DATA_BASE + XNVM_CONTROLLER_BASE + XNVM_CONTROLLER_STATUS_REG_OFFSET, dataBuf);
+        
+        pdiWriteCtrl(XNVM_DATA_BASE + XNVM_CONTROLLER_BASE + XNVM_CONTROLLER_CMD_REG_OFFSET, XNVM_CMD_READ_NVM_PDI);
         pdiSetPointer(address);
 
-        if (lenAsked>1)
+        if (len > 1)
         {
             pdiSendByte(XNVM_PDI_REPEAT_INSTR | XNVM_PDI_BYTE_DATA_MASK);
-            pdiSendByte(lenAsked-1);
+            pdiSendByte(len - 1);
         }
 
         pdiSendByte(XNVM_PDI_LD_INSTR | XNVM_PDI_LD_PTR_STAR_INC_MASK | XNVM_PDI_BYTE_DATA_MASK);
 
-        uchar *dst=dataBuf;
-        uchar i;
-        for(i=0;i<lenAsked;i++,dst++)
-        {
-            ret=pdiReadByte(10, dst);
-            if (ret!=PDI_STATUS_OK) break;
-        }
-        
-        if (ret==PDI_STATUS_OK) break;
+        if (pdiReadByte(100, dataBuf, len) == PDI_STATUS_OK) break;
     }
 
     return ret;
+}
+
+uchar pdiWaitNVM()
+{
+    uchar retry = 100;
+    
+    for(; retry>0; retry--)
+	{
+        uchar status;
+        if (pdiReadCtrl(XNVM_CONTROLLER_BASE + XNVM_CONTROLLER_STATUS_REG_OFFSET, &status) == PDI_STATUS_OK)
+            if ((status & XNVM_NVM_BUSY) == 0)
+                {
+                    pdi_nvmbusy = 0;
+                    return PDI_STATUS_OK;
+                }
+    }
+        
+    return PDI_STATUS_NVM_TIMEOUT; 
 }
